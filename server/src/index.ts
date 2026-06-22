@@ -11,14 +11,18 @@ import { registerKhangHandlers } from './socket/khangHandlers';
 const app = express();
 const httpServer = createServer(app);
 
+const allowedOrigins = process.env.CLIENT_URL
+  ? process.env.CLIENT_URL.split(',').map((s) => s.trim())
+  : ['http://localhost:5173'];
+
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    origin: allowedOrigins,
     methods: ['GET', 'POST'],
   },
 });
 
-app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173' }));
+app.use(cors({ origin: allowedOrigins }));
 app.use(express.json());
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));

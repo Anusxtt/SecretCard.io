@@ -18,15 +18,15 @@ export function SomSipPage() {
 
     const config: Phaser.Types.Core.GameConfig = {
       type: Phaser.AUTO,
-      width: 1280,
-      height: 720,
+      width: 1920,
+      height: 1080,
       parent: containerRef.current,
       backgroundColor: '#050f08',
       scale: {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH,
-        width: 1280,
-        height: 720,
+        width: 1920,
+        height: 1080,
       },
       scene: [SomSipScene],
     };

@@ -67,7 +67,7 @@ export function LobbyPage() {
         <div style={s.logo}>
           <span style={{ fontSize: 36 }}>🃏</span>
           <div>
-            <div style={s.logoTitle}>GAME.IO</div>
+            <div style={s.logoTitle}>SecretCard.io</div>
             <div style={s.logoSub}>ไพ่ไทยออนไลน์</div>
           </div>
         </div>
@@ -200,6 +200,13 @@ export function LobbyPage() {
           </div>
         </aside>
       </main>
+
+      {/* Footer */}
+      <footer style={s.footer}>
+        <span style={s.footerText}>© 2025 SecretCard.io</span>
+        <span style={s.footerDot}>·</span>
+        <span style={s.footerDev}>Dev by <span style={s.footerName}>SecretX</span></span>
+      </footer>
     </div>
   );
 }
@@ -396,5 +403,20 @@ const s: Record<string, React.CSSProperties> = {
     width: 32, height: 32, borderRadius: '50%',
     background: 'rgba(255,255,255,0.08)', border: 'none',
     color: '#fff', cursor: 'pointer', fontSize: 14,
+  },
+
+  footer: {
+    position: 'relative', zIndex: 1,
+    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+    padding: '14px 0',
+    borderTop: '1px solid rgba(255,255,255,0.05)',
+  },
+  footerText: { fontSize: 12, color: '#444' },
+  footerDot: { fontSize: 12, color: '#333' },
+  footerDev: { fontSize: 12, color: '#555' },
+  footerName: {
+    fontWeight: 700,
+    background: 'linear-gradient(135deg, #ffd700, #ff9800)',
+    WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
   },
 };
