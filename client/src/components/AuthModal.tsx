@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
+import { useT } from '../lib/i18n';
 
 interface AuthModalProps {
   onClose: () => void;
@@ -7,6 +8,7 @@ interface AuthModalProps {
 
 export function AuthModal({ onClose }: AuthModalProps) {
   const { loginAsGuest, loginWithEmail, signupWithEmail } = useAuth();
+  const { t } = useT();
   const [tab, setTab] = useState<'guest' | 'login' | 'signup'>('guest');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -15,7 +17,7 @@ export function AuthModal({ onClose }: AuthModalProps) {
   const [loading, setLoading] = useState(false);
 
   const handleGuest = () => {
-    if (!name.trim()) return setError('กรุณาใส่ชื่อเล่น');
+    if (!name.trim()) return setError(t.errNickname);
     loginAsGuest(name.trim());
     onClose();
   };
@@ -29,7 +31,7 @@ export function AuthModal({ onClose }: AuthModalProps) {
   };
 
   const handleSignup = async () => {
-    if (!name.trim()) return setError('กรุณาใส่ชื่อเล่น');
+    if (!name.trim()) return setError(t.errNickname);
     setLoading(true); setError('');
     const err = await signupWithEmail(email, password, name.trim());
     setLoading(false);
@@ -41,53 +43,48 @@ export function AuthModal({ onClose }: AuthModalProps) {
     <div style={s.overlay} onClick={onClose}>
       <div style={s.modal} onClick={(e) => e.stopPropagation()}>
 
-        {/* Header */}
         <div style={s.modalHeader}>
           <span style={{ fontSize: 32 }}>🃏</span>
           <div>
-            <div style={s.modalTitle}>เข้าสู่เกม</div>
-            <div style={s.modalSub}>เงินเริ่มต้น 1,000 บาท ฟรี!</div>
+            <div style={s.modalTitle}>{t.authTitle}</div>
+            <div style={s.modalSub}>{t.authSub}</div>
           </div>
         </div>
 
-        {/* Tabs */}
         <div style={s.tabs}>
-          {(['guest', 'login', 'signup'] as const).map((t) => (
+          {(['guest', 'login', 'signup'] as const).map((tp) => (
             <button
-              key={t}
-              style={{ ...s.tab, ...(tab === t ? s.activeTab : {}) }}
-              onClick={() => { setTab(t); setError(''); }}
+              key={tp}
+              style={{ ...s.tab, ...(tab === tp ? s.activeTab : {}) }}
+              onClick={() => { setTab(tp); setError(''); }}
             >
-              {t === 'guest' ? '👤 Guest' : t === 'login' ? '🔑 Login' : '📝 สมัคร'}
+              {tp === 'guest' ? t.tabGuest : tp === 'login' ? t.tabLogin : t.tabSignup}
             </button>
           ))}
         </div>
 
-        {/* Content */}
         <div style={s.content}>
           {tab === 'guest' && (
             <>
-              <div style={s.fieldLabel}>ชื่อเล่น</div>
+              <div style={s.fieldLabel}>{t.nickname}</div>
               <input
                 style={s.input}
-                placeholder="ใส่ชื่อเล่นของคุณ..."
+                placeholder={t.nicknamePlaceholder}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleGuest()}
                 autoFocus
               />
-              <div style={s.guestNote}>
-                🎮 เล่นได้ทันที ไม่ต้องสมัคร (ข้อมูลไม่ถูกบันทึก)
-              </div>
+              <div style={s.guestNote}>{t.guestNote}</div>
               <button style={s.submitBtn} onClick={handleGuest}>
-                เล่นเป็น Guest →
+                {t.playAsGuest}
               </button>
             </>
           )}
 
           {tab === 'login' && (
             <>
-              <div style={s.fieldLabel}>อีเมล</div>
+              <div style={s.fieldLabel}>{t.email}</div>
               <input
                 style={s.input}
                 type="email"
@@ -95,31 +92,31 @@ export function AuthModal({ onClose }: AuthModalProps) {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
-              <div style={s.fieldLabel}>รหัสผ่าน</div>
+              <div style={s.fieldLabel}>{t.password}</div>
               <input
                 style={s.input}
                 type="password"
-                placeholder="••••••••"
+                placeholder={t.passwordPlaceholder}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
               />
               <button style={{ ...s.submitBtn, opacity: loading ? 0.6 : 1 }} onClick={handleLogin} disabled={loading}>
-                {loading ? '⏳ กำลังเข้า...' : '🔑 เข้าสู่ระบบ'}
+                {loading ? t.loggingIn : t.loginBtn}
               </button>
             </>
           )}
 
           {tab === 'signup' && (
             <>
-              <div style={s.fieldLabel}>ชื่อเล่น</div>
+              <div style={s.fieldLabel}>{t.nickname}</div>
               <input
                 style={s.input}
-                placeholder="ชื่อที่จะแสดงใน Leaderboard"
+                placeholder={t.leaderboardNickPlaceholder}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
-              <div style={s.fieldLabel}>อีเมล</div>
+              <div style={s.fieldLabel}>{t.email}</div>
               <input
                 style={s.input}
                 type="email"
@@ -127,24 +124,22 @@ export function AuthModal({ onClose }: AuthModalProps) {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
-              <div style={s.fieldLabel}>รหัสผ่าน</div>
+              <div style={s.fieldLabel}>{t.password}</div>
               <input
                 style={s.input}
                 type="password"
-                placeholder="อย่างน้อย 6 ตัวอักษร"
+                placeholder={t.passwordMinPlaceholder}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSignup()}
               />
               <button style={{ ...s.submitBtn, opacity: loading ? 0.6 : 1 }} onClick={handleSignup} disabled={loading}>
-                {loading ? '⏳ กำลังสมัคร...' : '📝 สมัครสมาชิก (รับ 1,000 บาทฟรี)'}
+                {loading ? t.signingUp : t.signupBtn}
               </button>
             </>
           )}
 
-          {error && (
-            <div style={s.error}>⚠️ {error}</div>
-          )}
+          {error && <div style={s.error}>⚠️ {error}</div>}
         </div>
 
         <button style={s.closeBtn} onClick={onClose}>✕</button>
@@ -170,7 +165,6 @@ const s: Record<string, React.CSSProperties> = {
     boxShadow: '0 24px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,215,0,0.08)',
     display: 'flex', flexDirection: 'column', gap: 0,
   },
-
   modalHeader: {
     display: 'flex', alignItems: 'center', gap: 12,
     marginBottom: 20,
@@ -181,7 +175,6 @@ const s: Record<string, React.CSSProperties> = {
     WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
   },
   modalSub: { fontSize: 12, color: '#888', marginTop: 2 },
-
   tabs: {
     display: 'flex', gap: 6, marginBottom: 20,
     background: 'rgba(255,255,255,0.04)',
@@ -198,9 +191,7 @@ const s: Record<string, React.CSSProperties> = {
     color: '#ffd700',
     boxShadow: '0 0 0 1px rgba(255,215,0,0.25)',
   },
-
   content: { display: 'flex', flexDirection: 'column', gap: 10 },
-
   fieldLabel: { fontSize: 12, color: '#888', fontWeight: 600, marginBottom: -4 },
   input: {
     padding: '12px 16px',
@@ -210,7 +201,6 @@ const s: Record<string, React.CSSProperties> = {
     outline: 'none',
     transition: 'border-color 0.2s',
   },
-
   guestNote: {
     fontSize: 12, color: '#666',
     background: 'rgba(255,255,255,0.03)',
@@ -218,7 +208,6 @@ const s: Record<string, React.CSSProperties> = {
     borderRadius: 10, padding: '8px 12px',
     textAlign: 'center',
   },
-
   submitBtn: {
     marginTop: 6,
     padding: '13px 20px',
@@ -229,7 +218,6 @@ const s: Record<string, React.CSSProperties> = {
     boxShadow: '0 4px 18px rgba(255,165,0,0.3)',
     transition: 'opacity 0.2s',
   },
-
   error: {
     padding: '10px 14px',
     background: 'rgba(255,59,59,0.1)',
@@ -237,7 +225,6 @@ const s: Record<string, React.CSSProperties> = {
     borderRadius: 10,
     color: '#ff8080', fontSize: 13,
   },
-
   closeBtn: {
     position: 'absolute', top: 14, right: 14,
     width: 30, height: 30, borderRadius: '50%',

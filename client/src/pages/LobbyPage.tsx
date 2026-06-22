@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useSocket } from '../hooks/useSocket';
+import { useT } from '../lib/i18n';
 import { AuthModal } from '../components/AuthModal';
 import { Leaderboard } from '../components/Leaderboard';
 
@@ -12,21 +13,30 @@ export function LobbyPage() {
   const { user, loading, logout } = useAuth();
   const socket = useSocket();
   const navigate = useNavigate();
+  const { t, lang, toggle } = useT();
   const [dismissed, setDismissed] = useState(false);
   const [gameType, setGameType] = useState<GameType>('somsip');
   const [betAmount, setBetAmount] = useState(5);
   const [joining, setJoining] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const wasLoggedIn = useRef(false);
 
   useEffect(() => {
-    if (!loading && !user) setDismissed(false);
+    if (!loading) {
+      if (user) {
+        wasLoggedIn.current = true;
+      } else if (wasLoggedIn.current) {
+        wasLoggedIn.current = false;
+        setDismissed(false);
+      }
+    }
   }, [user, loading]);
 
   const showAuth = !loading && !user && !dismissed;
 
   const joinGame = (withBots: boolean) => {
     if (!user) return setDismissed(false);
-    if (user.balance < betAmount) return alert('เงินไม่พอสำหรับการเดิมพัน');
+    if (user.balance < betAmount) return alert(t.notEnoughBalance);
     setJoining(true);
 
     socket.emit('join_lobby', {
@@ -48,6 +58,23 @@ export function LobbyPage() {
     });
   };
 
+  const games = [
+    {
+      id: 'somsip' as GameType, icon: '🀄',
+      name: t.games.somsip.name,
+      desc: t.games.somsip.desc,
+      players: lang === 'th' ? '2–5 คน' : '2–5 players',
+      diff: lang === 'th' ? 'ปานกลาง' : 'Medium', diffColor: '#f39c12',
+    },
+    {
+      id: 'khang' as GameType, icon: '🃏',
+      name: t.games.khang.name,
+      desc: t.games.khang.desc,
+      players: lang === 'th' ? '2–5 คน' : '2–5 players',
+      diff: lang === 'th' ? 'ง่าย' : 'Easy', diffColor: '#27ae60',
+    },
+  ];
+
   return (
     <div style={s.root}>
       <div style={s.bgOverlay} />
@@ -68,49 +95,42 @@ export function LobbyPage() {
           <span style={{ fontSize: 36 }}>🃏</span>
           <div>
             <div style={s.logoTitle}>SecretCard.io</div>
-            <div style={s.logoSub}>ไพ่ไทยออนไลน์</div>
+            <div style={s.logoSub}>{t.onlineCard}</div>
           </div>
         </div>
         <nav style={s.nav}>
-          <button style={s.navBtn} onClick={() => setShowLeaderboard(true)}>🏆 อันดับ</button>
+          {/* Language toggle */}
+          <button style={s.langBtn} onClick={toggle} title="Switch language">
+            {lang === 'th' ? '🇬🇧 EN' : '🇹🇭 TH'}
+          </button>
+          <button style={s.navBtn} onClick={() => setShowLeaderboard(true)}>{t.rankBtn}</button>
           {user ? (
             <div style={s.userArea}>
               <div style={s.walletChip}>
                 <span style={{ fontSize: 20 }}>💰</span>
                 <div>
-                  <div style={s.walletName}>{user.isGuest ? '👤 Guest' : '⭐ ' + user.name}</div>
-                  <div style={s.walletBal}>{user.balance.toLocaleString()} บาท</div>
+                  <div style={s.walletName}>{user.isGuest ? t.guest : '⭐ ' + user.name}</div>
+                  <div style={s.walletBal}>{user.balance.toLocaleString()} {t.baht}</div>
                 </div>
               </div>
-              <button style={s.logoutBtn} onClick={logout}>ออก</button>
+              <button style={s.logoutBtn} onClick={logout}>{t.logoutBtn}</button>
             </div>
           ) : (
-            <button style={s.loginBtn} onClick={() => setDismissed(false)}>เข้าสู่ระบบ / สมัคร</button>
+            <button style={s.loginBtn} onClick={() => setDismissed(false)}>{t.loginSignup}</button>
           )}
         </nav>
       </header>
 
       {/* Main */}
       <main style={s.main}>
-        {/* Left panel */}
         <section style={s.gamePanel}>
           <div style={s.panelTitle}>
-            <span>เลือกเกม</span>
+            <span>{lang === 'th' ? 'เลือกเกม' : 'Choose Game'}</span>
             <div style={s.titleLine} />
           </div>
 
-          {/* Game cards */}
           <div style={s.gameCards}>
-            {([
-              {
-                id: 'somsip' as GameType, icon: '🀄', name: 'สมสิบ',
-                desc: 'จับคู่ให้ได้ 3 คู่ รวมแต้ม 10', players: '2–5 คน', diff: 'ปานกลาง', diffColor: '#f39c12',
-              },
-              {
-                id: 'khang' as GameType, icon: '🃏', name: 'แคง',
-                desc: 'แต้มน้อยสุดชนะ หรือประกาศแคง', players: '2–5 คน', diff: 'ง่าย', diffColor: '#27ae60',
-              },
-            ]).map((g) => {
+            {games.map((g) => {
               const active = gameType === g.id;
               return (
                 <button key={g.id} style={{ ...s.gCard, ...(active ? s.gCardActive : {}) }} onClick={() => setGameType(g.id)}>
@@ -128,9 +148,8 @@ export function LobbyPage() {
             })}
           </div>
 
-          {/* Bet */}
           <div>
-            <div style={s.betLabel}>เลือกเดิมพัน</div>
+            <div style={s.betLabel}>{lang === 'th' ? 'เลือกเดิมพัน' : 'Select Bet'}</div>
             <div style={s.betChips}>
               {BET_OPTIONS.map((b) => (
                 <button
@@ -140,33 +159,36 @@ export function LobbyPage() {
                 >
                   <span style={{ fontSize: 18 }}>🪙</span>
                   <span style={s.chipVal}>{b}</span>
-                  <span style={s.chipUnit}>บาท</span>
+                  <span style={s.chipUnit}>{t.baht}</span>
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Action buttons */}
           <div style={s.actions}>
             <button
               style={{ ...s.playBtn, ...s.botBtn, opacity: joining ? 0.65 : 1 }}
               onClick={() => joinGame(true)}
               disabled={joining}
             >
-              {joining ? '⏳ กำลังเข้า...' : '🤖 เล่นกับ Bot'}
+              {joining ? `⏳ ${t.joining}` : t.playBot}
             </button>
             <button
               style={{ ...s.playBtn, ...s.onlineBtn, opacity: joining ? 0.65 : 1 }}
               onClick={() => joinGame(false)}
               disabled={joining}
             >
-              {joining ? '⏳ กำลังรอ...' : '🌐 Online Multiplayer'}
+              {joining ? `⏳ ${t.joining}` : t.playOnline}
             </button>
           </div>
 
-          {/* Badges */}
           <div style={s.infoStrip}>
-            {[['🛡', 'ปลอดภัย 100%'], ['⚡', 'Realtime'], ['🎮', 'Free to Play'], ['🏆', 'Leaderboard']].map(([icon, text]) => (
+            {[
+              ['🛡', lang === 'th' ? 'ปลอดภัย 100%' : '100% Safe'],
+              ['⚡', 'Realtime'],
+              ['🎮', 'Free to Play'],
+              ['🏆', 'Leaderboard'],
+            ].map(([icon, text]) => (
               <div key={text} style={s.badge}>
                 <span>{icon}</span>
                 <span style={{ fontSize: 12, color: '#888' }}>{text}</span>
@@ -175,25 +197,12 @@ export function LobbyPage() {
           </div>
         </section>
 
-        {/* Right sidebar */}
         <aside style={s.sidebar}>
           <Leaderboard compact />
           <div style={s.rulesCard}>
-            <div style={s.rulesTitle}>📖 กติกา {gameType === 'somsip' ? 'สมสิบ' : 'แคง'}</div>
+            <div style={s.rulesTitle}>{t.rulesTitle} {t.games[gameType].name}</div>
             <ul style={s.rulesList}>
-              {(gameType === 'somsip' ? [
-                '🃏 ได้ไพ่ 5 ใบ จั่วหรือหยิบกองทิ้ง',
-                '🔁 ทิ้งไพ่ 1 ใบให้กองทิ้งตัวเอง',
-                '🏆 จับคู่ครบ 3 คู่ก็ชนะ',
-                '⚡ ขัดเทิร์นได้ถ้าครบ 3 คู่ทันที',
-                '🃏 โจ๊กเกอร์ = ไพ่ที่ขึ้นเปิด',
-              ] : [
-                '🃏 ได้ไพ่ 5 ใบทุกคน',
-                '🔢 A=1, 2-10=ตามหน้า, J/Q/K=10',
-                '👑 ประกาศแคงถ้าแต้มน้อยสุด',
-                '⚡ ไหลได้ถ้ามีไพ่หน้าเดียวกับกองทิ้ง',
-                '🏆 แต้มน้อยสุดชนะ',
-              ]).map((r, i) => (
+              {t.games[gameType].rules.map((r, i) => (
                 <li key={i} style={s.rulesItem}>{r}</li>
               ))}
             </ul>
@@ -201,11 +210,10 @@ export function LobbyPage() {
         </aside>
       </main>
 
-      {/* Footer */}
       <footer style={s.footer}>
         <span style={s.footerText}>© 2025 SecretCard.io</span>
         <span style={s.footerDot}>·</span>
-        <span style={s.footerDev}>Dev by <span style={s.footerName}>SecretX</span></span>
+        <span style={s.footerDev}>{t.footer} <span style={s.footerName}>SecretX</span></span>
       </footer>
     </div>
   );
@@ -241,6 +249,13 @@ const s: Record<string, React.CSSProperties> = {
   },
   logoSub: { fontSize: 11, color: '#666', letterSpacing: 1, marginTop: 1 },
   nav: { display: 'flex', alignItems: 'center', gap: 14 },
+  langBtn: {
+    padding: '7px 16px',
+    background: 'rgba(255,255,255,0.06)',
+    border: '1px solid rgba(255,255,255,0.15)',
+    borderRadius: 20, color: '#ddd', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+    transition: 'all 0.2s',
+  },
   navBtn: {
     padding: '8px 18px',
     background: 'rgba(255,255,255,0.05)',
