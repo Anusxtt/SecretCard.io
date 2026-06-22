@@ -46,3 +46,16 @@ const PORT = Number(process.env.PORT) || 3001;
 httpServer.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
+// Keep-alive: ping ตัวเองทุก 14 นาที เพื่อป้องกัน Railway sleep
+if (process.env.RAILWAY_PUBLIC_DOMAIN) {
+  const selfUrl = `https://${process.env.RAILWAY_PUBLIC_DOMAIN}/health`;
+  setInterval(async () => {
+    try {
+      await fetch(selfUrl);
+      console.log('[keep-alive] ping ok');
+    } catch {
+      // ignore
+    }
+  }, 14 * 60 * 1000);
+}
