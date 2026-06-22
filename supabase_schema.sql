@@ -14,6 +14,10 @@ CREATE TABLE IF NOT EXISTS profiles (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- เพิ่ม avatar columns (รันแยกถ้า table มีอยู่แล้ว)
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS avatar_seed TEXT DEFAULT 'Dragon';
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS avatar_frame TEXT DEFAULT 'none';
+
 -- game_history
 CREATE TABLE IF NOT EXISTS game_history (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -44,7 +48,7 @@ ALTER TABLE game_history ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can view own profile"
   ON profiles FOR SELECT USING (auth.uid() = id);
 
--- Policy: ผู้เล่นอัพเดต username ตัวเองได้
+-- Policy: ผู้เล่นอัพเดต profile ตัวเองได้ (username, avatar_url, avatar_frame)
 CREATE POLICY "Users can update own profile"
   ON profiles FOR UPDATE USING (auth.uid() = id);
 
@@ -73,3 +77,29 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION handle_new_user();
+
+-- ==============================
+-- Storage: avatars bucket
+-- สร้าง bucket ใน Supabase Dashboard > Storage > New bucket
+-- Name: avatars, Public: true
+-- แล้วรัน policies ด้านล่าง
+-- ==============================
+
+-- Policy: ผู้ใช้อัพโหลด avatar ตัวเองได้
+CREATE POLICY "Users can upload own avatar"
+  ON storage.objects FOR INSERT
+  WITH CHECK (bucket_id = 'avatars' AND auth.uid()::text = (storage.foldername(name))[1]);
+
+-- Policy: ทุกคนดู avatar ได้ (public bucket)
+CREATE POLICY "Anyone can view avatars"
+  ON storage.objects FOR SELECT
+  USING (bucket_id = 'avatars');
+
+-- Policy: ผู้ใช้ลบ/อัพเดต avatar ตัวเองได้
+CREATE POLICY "Users can update own avatar"
+  ON storage.objects FOR UPDATE
+  USING (bucket_id = 'avatars' AND auth.uid()::text = (storage.foldername(name))[1]);
+
+CREATE POLICY "Users can delete own avatar"
+  ON storage.objects FOR DELETE
+  USING (bucket_id = 'avatars' AND auth.uid()::text = (storage.foldername(name))[1]);

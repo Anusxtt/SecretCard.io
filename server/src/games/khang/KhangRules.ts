@@ -76,35 +76,42 @@ export function resolveKhang(
   const declarer = players.find((p) => p.playerId === declarerId)!;
   const declarerSpecial = checkSpecialHand(declarer.hand);
   const declarerTotal = calcTotal(declarer.hand);
-
-  // เช็คว่ามีใครมีแต้มน้อยกว่าคนแคง
-  const losers: string[] = [];
-  let winnerId = declarerId;
-
   const others = players.filter((p) => p.playerId !== declarerId);
 
-  // เช็ค special hand ป๊อกตั้งแต่แจก
-  for (const p of others) {
-    const special = checkSpecialHand(p.hand);
-    if (special && compareSpecialHands(special, declarerSpecial) > 0) {
-      winnerId = p.playerId;
-      break;
-    }
-  }
-
   let wrongKhangId: string | null = null;
+  let winnerId = declarerId;
 
-  if (winnerId === declarerId) {
-    // แคงถูก: คนอื่นทั้งหมดแพ้
+  // แคงผิดถ้ามีคนอื่นแต้มน้อยกว่าหรือเท่ากัน (และไม่มี special ของคนแคง)
+  // หรือคนอื่นมี special hand ที่สูงกว่า
+  const declarerWins = (() => {
+    // ถ้าคนแคงมี special hand → ชนะทันที (ถ้าไม่มีใครสูงกว่า)
+    if (declarerSpecial) {
+      for (const p of others) {
+        const s = checkSpecialHand(p.hand);
+        if (s && compareSpecialHands(s, declarerSpecial) > 0) return false;
+      }
+      return true;
+    }
+    // ไม่มี special — คนแคงต้องมีแต้มน้อยสุดในวง (น้อยกว่าทุกคน)
+    for (const p of others) {
+      if (calcTotal(p.hand) <= declarerTotal) return false;
+    }
+    return true;
+  })();
+
+  const losers: string[] = [];
+
+  if (declarerWins) {
+    // แคงถูก
     for (const p of others) losers.push(p.playerId);
   } else {
-    // แคงผิด: คนแคงแพ้
+    // แคงผิด
     wrongKhangId = declarerId;
     losers.push(declarerId);
-    winnerId = players.reduce((best, p) => {
-      if (p.playerId === declarerId) return best;
-      return calcTotal(p.hand) < calcTotal(best.hand) ? p : best;
-    }, others[0]).playerId;
+    // ผู้ชนะ = คนที่มีแต้มน้อยสุดในบรรดาคนที่ไม่ใช่คนแคง
+    winnerId = others.reduce((best, p) =>
+      calcTotal(p.hand) < calcTotal(best.hand) ? p : best
+    ).playerId;
   }
 
   return { winnerId, loserIds: losers, wrongKhangId, flows: [] };

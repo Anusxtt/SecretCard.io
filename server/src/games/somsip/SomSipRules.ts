@@ -71,11 +71,13 @@ export function countPairs(hand: Card[], jokerValue: number): number {
 }
 
 export function checkWin(hand: Card[], jokerValue: number): boolean {
-  return hand.length === 6 && countPairs(hand, jokerValue) === 3;
+  // ชนะเมื่อจับคู่ได้ครบทุกใบ (คู่ × 2 = จำนวนไพ่ทั้งหมด)
+  if (hand.length === 0 || hand.length % 2 !== 0) return false;
+  return countPairs(hand, jokerValue) === hand.length / 2;
 }
 
 export function canIntercept(hand: Card[], drawnCard: Card, jokerValue: number): boolean {
-  // มี 2 คู่ + รอ 1 ใบ = ถ้าไพ่ที่จั่วขึ้นมาทำให้ชนะได้
+  // มีไพ่ 5 ใบ (2 คู่ + 1 ใบโดด) + จั่วได้ใบที่ทำให้ครบ 3 คู่
   const testHand = [...hand, drawnCard];
   return checkWin(testHand, jokerValue);
 }

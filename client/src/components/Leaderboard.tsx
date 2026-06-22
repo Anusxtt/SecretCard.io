@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSocket } from '../hooks/useSocket';
+import { Trophy, Medal } from 'lucide-react';
 
 interface Entry {
   username: string;
@@ -8,10 +9,10 @@ interface Entry {
   losses: number;
 }
 
-const RANK_STYLES: Record<number, { icon: string; color: string }> = {
-  0: { icon: '🥇', color: '#ffd700' },
-  1: { icon: '🥈', color: '#bdc3c7' },
-  2: { icon: '🥉', color: '#cd7f32' },
+const RANK_COLORS: Record<number, string> = {
+  0: '#ffd700',
+  1: '#bdc3c7',
+  2: '#cd7f32',
 };
 
 export function Leaderboard({ compact = false }: { compact?: boolean }) {
@@ -29,7 +30,7 @@ export function Leaderboard({ compact = false }: { compact?: boolean }) {
   return (
     <div style={{ ...s.container, ...(compact ? s.compact : {}) }}>
       <div style={s.header}>
-        <span style={s.headerIcon}>🏆</span>
+        <Trophy size={18} color="#ffd700" />
         <span style={s.headerTitle}>Leaderboard</span>
         {compact && entries.length > 5 && (
           <span style={s.headerSub}>Top 5</span>
@@ -41,7 +42,7 @@ export function Leaderboard({ compact = false }: { compact?: boolean }) {
       ) : (
         <div style={s.list}>
           {displayEntries.map((e, i) => {
-            const rank = RANK_STYLES[i];
+            const color = RANK_COLORS[i];
             const winRate = e.wins + e.losses > 0
               ? Math.round((e.wins / (e.wins + e.losses)) * 100)
               : 0;
@@ -49,15 +50,15 @@ export function Leaderboard({ compact = false }: { compact?: boolean }) {
             return (
               <div key={e.username} style={{ ...s.row, ...(i === 0 ? s.rowFirst : {}) }}>
                 <div style={s.rankCell}>
-                  {rank ? (
-                    <span style={{ fontSize: compact ? 18 : 22 }}>{rank.icon}</span>
+                  {i < 3 ? (
+                    <Medal size={compact ? 16 : 20} color={color} />
                   ) : (
                     <span style={{ ...s.rankNum, color: '#666' }}>{i + 1}</span>
                   )}
                 </div>
 
                 <div style={s.nameCell}>
-                  <div style={{ ...s.username, color: rank?.color ?? '#fff' }}>
+                  <div style={{ ...s.username, color: color ?? '#fff' }}>
                     {e.username}
                   </div>
                   {!compact && (
@@ -75,7 +76,7 @@ export function Leaderboard({ compact = false }: { compact?: boolean }) {
                   )}
                 </div>
 
-                <div style={{ ...s.balCell, color: rank?.color ?? '#ffd700' }}>
+                <div style={{ ...s.balCell, color: color ?? '#ffd700' }}>
                   <span style={s.balNum}>{e.balance.toLocaleString()}</span>
                   <span style={s.balUnit}>฿</span>
                 </div>
@@ -105,7 +106,6 @@ const s: Record<string, React.CSSProperties> = {
     marginBottom: 14, paddingBottom: 10,
     borderBottom: '1px solid rgba(255,215,0,0.12)',
   },
-  headerIcon: { fontSize: 20 },
   headerTitle: { flex: 1, fontSize: 15, fontWeight: 700, color: '#ffd700' },
   headerSub: { fontSize: 11, color: '#666' },
 

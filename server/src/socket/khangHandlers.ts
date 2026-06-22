@@ -1,7 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import { RoomManager } from '../rooms/RoomManager';
 import { KhangRoom } from '../games/khang/KhangGame';
-import { adjustBalance, saveGameHistory } from '../services/walletService';
+import { adjustBalance, saveGameHistory, recordWin, recordLoss } from '../services/walletService';
 
 export function registerKhangHandlers(io: Server, socket: Socket, rm: RoomManager) {
 
@@ -11,7 +11,15 @@ export function registerKhangHandlers(io: Server, socket: Socket, rm: RoomManage
 
     const state = room.startGame();
     broadcastState(io, room, state);
+    // client จะ animate แจกไพ่แล้ว emit kh:deal_done กลับมา
+  });
 
+  socket.on('kh:deal_done', (data: { roomId: string }) => {
+    const room = rm.getRoom(data.roomId) as KhangRoom | undefined;
+    if (!room) return;
+    const state = room.beginPlay();
+    if (!state) return;
+    broadcastState(io, room, state);
     if (state.phase === 'finished' && state.result) {
       handleFinish(io, room, state.result.winnerId);
     } else {
@@ -40,12 +48,13 @@ export function registerKhangHandlers(io: Server, socket: Socket, rm: RoomManage
     if (state.result) handleFinish(io, room, state.result.winnerId);
   });
 
-  // ทิ้งไพ่ (หลังจั่ว)
-  socket.on('kh:discard', (data: { roomId: string; cardId: string }) => {
+  // ทิ้งไพ่ (หลังจั่ว) — รับ cardIds array หรือ cardId ใบเดียวก็ได้
+  socket.on('kh:discard', (data: { roomId: string; cardId?: string; cardIds?: string[] }) => {
     const room = rm.getRoom(data.roomId) as KhangRoom | undefined;
     if (!room) return;
     const playerIndex = room.players.findIndex((p) => p.socketId === socket.id);
-    const state = room.handleDiscard(playerIndex, data.cardId);
+    const ids = data.cardIds ?? (data.cardId ? [data.cardId] : []);
+    const state = room.handleDiscard(playerIndex, ids);
     if (!state) return;
     broadcastState(io, room, state);
     if (state.result) handleFinish(io, room, state.result.winnerId);
@@ -60,7 +69,8 @@ export function registerKhangHandlers(io: Server, socket: Socket, rm: RoomManage
     const state = room.handleFlow(playerIndex, { cardId: data.cardId });
     if (!state) return;
     broadcastState(io, room, state);
-    // หลังไหล → เทิร์นเดิม ไม่ต้อง runBot (รอ human จั่ว)
+    if (state.result) handleFinish(io, room, state.result.winnerId);
+    else runBotIfNeeded(io, room);
   });
 }
 
@@ -71,8 +81,11 @@ async function handleFinish(io: Server, room: KhangRoom, winnerId: string) {
 
   for (const p of room.players) {
     if (!p.isGuest && !p.isBot) {
-      const delta = p.playerId === winnerId ? pot - room.betAmount : -room.betAmount;
+      const isWinner = p.playerId === winnerId;
+      const delta = isWinner ? pot - room.betAmount : -room.betAmount;
       await adjustBalance(p.playerId, delta);
+      if (isWinner) await recordWin(p.playerId);
+      else await recordLoss(p.playerId);
     }
   }
 

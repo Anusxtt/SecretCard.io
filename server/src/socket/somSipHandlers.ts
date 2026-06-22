@@ -1,7 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import { RoomManager } from '../rooms/RoomManager';
 import { SomSipRoom } from '../games/somsip/SomSipGame';
-import { adjustBalance, saveGameHistory } from '../services/walletService';
+import { adjustBalance, saveGameHistory, recordWin, recordLoss } from '../services/walletService';
 
 export function registerSomSipHandlers(io: Server, socket: Socket, rm: RoomManager) {
   socket.on('ss:start', async (data: { roomId: string }) => {
@@ -73,8 +73,11 @@ async function handleFinish(io: Server, room: SomSipRoom, winnerId: string) {
   // อัพเดต balance (เฉพาะ non-guest)
   for (const p of room.players) {
     if (!p.isGuest && !p.isBot) {
-      const delta = p.playerId === winnerId ? pot - room.betAmount : -room.betAmount;
+      const isWinner = p.playerId === winnerId;
+      const delta = isWinner ? pot - room.betAmount : -room.betAmount;
       await adjustBalance(p.playerId, delta);
+      if (isWinner) await recordWin(p.playerId);
+      else await recordLoss(p.playerId);
     }
   }
 

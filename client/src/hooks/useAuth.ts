@@ -5,37 +5,59 @@ export interface AuthUser {
   id: string;
   name: string;
   balance: number;
+  wins: number;
+  losses: number;
   isGuest: boolean;
+  avatarSeed?: string;
+  avatarFrame?: string;
 }
 
 export function useAuth() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const buildUser = (id: string, profile: { username?: string; balance?: number; wins?: number; losses?: number; avatar_seed?: string; avatar_frame?: string } | null): AuthUser => ({
+    id,
+    name: profile?.username ?? 'ผู้เล่น',
+    balance: profile?.balance ?? 1000,
+    wins: profile?.wins ?? 0,
+    losses: profile?.losses ?? 0,
+    isGuest: false,
+    avatarSeed: profile?.avatar_seed ?? undefined,
+    avatarFrame: profile?.avatar_frame ?? 'none',
+  });
+
+  const createAutoGuest = (): AuthUser => {
+    const id = `guest_${Date.now()}`;
+    const adjectives = ['Lucky', 'Swift', 'Bold', 'Brave', 'Sharp', 'Cool', 'Wild', 'Ace', 'Sly', 'Keen', 'Deft', 'Slick'];
+    const nouns = ['Tiger', 'Dragon', 'Eagle', 'Wolf', 'Phoenix', 'Shark', 'Panda', 'Fox', 'Cobra', 'Hawk', 'Bear', 'Lynx'];
+    const suffix = Math.floor(1000 + Math.random() * 9000); // 4-digit number → unique
+    const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
+    const noun = nouns[Math.floor(Math.random() * nouns.length)];
+    const name = `${adj}${noun}${suffix}`;
+    const guest: AuthUser = { id, name, balance: 500, wins: 0, losses: 0, isGuest: true };
+    localStorage.setItem('guest_user', JSON.stringify(guest));
+    return guest;
+  };
+
   useEffect(() => {
-    // โหลด guest จาก localStorage
-    const guest = localStorage.getItem('guest_user');
-    if (guest) {
-      setUser(JSON.parse(guest));
-      setLoading(false);
-      return;
-    }
+    const guestRaw = localStorage.getItem('guest_user');
 
     supabase.auth.getSession().then(async ({ data }) => {
       if (data.session?.user) {
+        // logged-in user — ignore any guest
         const { data: profile } = await supabase
           .from('profiles')
-          .select('username, balance')
+          .select('username, balance, wins, losses, avatar_seed, avatar_frame')
           .eq('id', data.session.user.id)
           .single();
-
-        setUser({
-          id: data.session.user.id,
-          name: profile?.username ?? 'ผู้เล่น',
-          balance: profile?.balance ?? 1000,
-          isGuest: false,
-        });
+        setUser(buildUser(data.session.user.id, profile));
+        setLoading(false);
+        return;
       }
+      // no session — use stored guest or create new one
+      const guest = guestRaw ? JSON.parse(guestRaw) : createAutoGuest();
+      setUser(guest);
       setLoading(false);
     });
 
@@ -43,16 +65,10 @@ export function useAuth() {
       if (session?.user) {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('username, balance')
+          .select('username, balance, wins, losses, avatar_seed, avatar_frame')
           .eq('id', session.user.id)
           .single();
-
-        setUser({
-          id: session.user.id,
-          name: profile?.username ?? 'ผู้เล่น',
-          balance: profile?.balance ?? 1000,
-          isGuest: false,
-        });
+        setUser(buildUser(session.user.id, profile));
       } else if (event === 'SIGNED_OUT') {
         localStorage.removeItem('guest_user');
         setUser(null);
@@ -67,6 +83,8 @@ export function useAuth() {
       id: `guest_${Date.now()}`,
       name,
       balance: 1000,
+      wins: 0,
+      losses: 0,
       isGuest: true,
     };
     localStorage.setItem('guest_user', JSON.stringify(guest));
@@ -76,6 +94,13 @@ export function useAuth() {
   const loginWithEmail = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     return error;
+  };
+
+  const loginWithGoogle = async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin },
+    });
   };
 
   const signupWithEmail = async (email: string, password: string, username: string) => {
@@ -103,5 +128,15 @@ export function useAuth() {
     if (data) setUser({ ...user, balance: data.balance });
   };
 
-  return { user, loading, loginAsGuest, loginWithEmail, signupWithEmail, logout, refreshBalance };
+  const refreshProfile = async () => {
+    if (!user || user.isGuest) return;
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('username, balance, wins, losses, avatar_seed, avatar_frame')
+      .eq('id', user.id)
+      .single();
+    if (profile) setUser(buildUser(user.id, profile));
+  };
+
+  return { user, loading, loginAsGuest, loginWithEmail, loginWithGoogle, signupWithEmail, logout, refreshBalance, refreshProfile };
 }

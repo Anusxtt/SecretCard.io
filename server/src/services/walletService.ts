@@ -29,11 +29,15 @@ export async function transferBet(
 }
 
 export async function recordWin(userId: string): Promise<void> {
-  await supabase.rpc('increment_wins', { user_id: userId });
+  const { data } = await supabase.from('profiles').select('wins').eq('id', userId).single();
+  const next = (data?.wins ?? 0) + 1;
+  await supabase.from('profiles').update({ wins: next }).eq('id', userId);
 }
 
 export async function recordLoss(userId: string): Promise<void> {
-  await supabase.rpc('increment_losses', { user_id: userId });
+  const { data } = await supabase.from('profiles').select('losses').eq('id', userId).single();
+  const next = (data?.losses ?? 0) + 1;
+  await supabase.from('profiles').update({ losses: next }).eq('id', userId);
 }
 
 export async function saveGameHistory(

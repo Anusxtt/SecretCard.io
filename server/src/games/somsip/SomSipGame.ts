@@ -133,12 +133,13 @@ export class SomSipRoom extends Room {
     const cardIdx = hand.findIndex((c) => c.id === payload.cardId);
     if (cardIdx === -1) return null;
 
+    // เช็ค win ด้วยไพ่ที่เหลือหลังทิ้ง (virtual)
+    const remaining = hand.filter((_, i) => i !== cardIdx);
     const [card] = hand.splice(cardIdx, 1);
     gs.players[playerIndex].discardPile.push(card);
     gs.lastDrawnCard = null;
 
-    // เช็ค win ด้วยไพ่ในมือ 6 ใบ
-    if (checkWin(gs.players[playerIndex].hand, gs.jokerValue)) {
+    if (checkWin(remaining, gs.jokerValue)) {
       gs.phase = 'finished';
       gs.winnerId = gs.players[playerIndex].playerId;
       return gs;

@@ -23,11 +23,11 @@ export interface KhangGameState {
   deck: Card[];
   discardPile: Card[];
   currentPlayerIndex: number;
-  phase: 'waiting' | 'playing' | 'finished';
+  phase: 'waiting' | 'dealing' | 'playing' | 'finished';
   result: KhangResult | null;
   lastDiscard: Card | null;
   flowChain: { playerId: string; cardIds: string[] }[];
-  waitingDiscard: boolean; // true = ต้องทิ้งไพ่ก่อน (หลังจั่วแล้ว)
+  waitingDiscard: boolean;
 }
 
 export class KhangRoom extends Room {
@@ -46,40 +46,53 @@ export class KhangRoom extends Room {
       isBot: p.isBot,
     }));
 
+    const startIndex = Math.floor(Math.random() * this.players.length);
+
     this.gameState = {
       roomId: this.roomId,
       players: playerStates,
       deck,
       discardPile: [],
-      currentPlayerIndex: 0,
-      phase: 'playing',
+      currentPlayerIndex: startIndex,
+      phase: 'dealing',
       result: null,
       lastDiscard: null,
       flowChain: [],
       waitingDiscard: false,
     };
     this.started = true;
-
-    // เช็ค special hand ป๊อกทันที
-    for (const p of playerStates) {
-      const special = checkSpecialHand(p.hand);
-      if (special) {
-        this.gameState.phase = 'finished';
-        this.gameState.result = resolveKhang(p.playerId, playerStates);
-        break;
-      }
-    }
-
     return this.gameState;
   }
 
+  // เรียกหลัง animation แจกไพ่เสร็จ
+  beginPlay(): KhangGameState | null {
+    const gs = this.gameState;
+    if (!gs || gs.phase !== 'dealing') return null;
+    gs.phase = 'playing';
+
+    // เช็ค special hand ป๊อกทันที
+    for (const p of gs.players) {
+      const special = checkSpecialHand(p.hand);
+      if (special) {
+        gs.phase = 'finished';
+        gs.result = resolveKhang(p.playerId, gs.players.map((pl) => ({ playerId: pl.playerId, hand: pl.hand })));
+        break;
+      }
+    }
+    return gs;
+  }
+
   handleAction(socketId: string, action: string, payload: unknown): unknown {
-    if (!this.gameState || this.gameState.phase !== 'playing') return null;
+    if (!this.gameState || (this.gameState.phase !== 'playing' && this.gameState.phase !== 'dealing')) return null;
     const playerIndex = this.players.findIndex((p) => p.socketId === socketId);
     switch (action) {
       case 'khang': return this.handleKhang(playerIndex);
       case 'draw': return this.handleDraw(playerIndex);
-      case 'discard': return this.handleDiscard(playerIndex, (payload as { cardId: string }).cardId);
+      case 'discard': {
+        const p = payload as { cardId?: string; cardIds?: string[] };
+        const ids = p.cardIds ?? (p.cardId ? [p.cardId] : []);
+        return this.handleDiscard(playerIndex, ids);
+      }
       case 'flow': return this.handleFlow(playerIndex, payload as { cardId: string });
       default: return null;
     }
@@ -118,19 +131,30 @@ export class KhangRoom extends Room {
     return gs;
   }
 
-  // ─── ทิ้งไพ่ (หลังจั่วแล้ว) ────────────────────────────────────
-  handleDiscard(playerIndex: number, cardId: string): KhangGameState | null {
+  // ─── ทิ้งไพ่ (หลังจั่วแล้ว) รับ cardIds หลายใบได้ แต่ต้อง rank เดียวกันทั้งหมด ────
+  handleDiscard(playerIndex: number, cardId: string | string[]): KhangGameState | null {
     const gs = this.gameState!;
     if (playerIndex !== gs.currentPlayerIndex) return null;
-    if (!gs.waitingDiscard) return null; // ต้องจั่วก่อน
+    if (!gs.waitingDiscard) return null;
 
     const hand = gs.players[playerIndex].hand;
-    const idx = hand.findIndex((c) => c.id === cardId);
-    if (idx === -1) return null;
+    const ids = Array.isArray(cardId) ? cardId : [cardId];
+    if (ids.length === 0) return null;
 
-    const [discarded] = hand.splice(idx, 1);
-    gs.discardPile.push(discarded);
-    gs.lastDiscard = discarded;
+    // ตรวจว่าทุก id มีในมือ
+    const cards = ids.map((id) => hand.find((c) => c.id === id)).filter(Boolean) as Card[];
+    if (cards.length !== ids.length) return null;
+
+    // ถ้าทิ้งหลายใบ ต้อง rank เดียวกันทั้งหมด
+    if (cards.length > 1 && new Set(cards.map((c) => c.rank)).size > 1) return null;
+
+    for (const card of cards) {
+      const i = hand.findIndex((c) => c.id === card.id);
+      hand.splice(i, 1);
+      gs.discardPile.push(card);
+    }
+
+    gs.lastDiscard = cards[cards.length - 1];
     gs.flowChain = [];
     gs.waitingDiscard = false;
     gs.currentPlayerIndex = (playerIndex + 1) % gs.players.length;

@@ -2,6 +2,16 @@ import { useEffect, useRef } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import Phaser from 'phaser';
 import { SomSipScene } from '../game/somsip/SomSipScene';
+import { AvatarBubble } from '../components/AvatarBubble';
+import { Coins, LogOut, Gamepad2 } from 'lucide-react';
+
+interface GameState {
+  playerId: string;
+  betAmount: number;
+  avatarSeed?: string;
+  avatarFrame?: string;
+  playerName?: string;
+}
 
 export function SomSipPage() {
   const { roomId } = useParams<{ roomId: string }>();
@@ -10,7 +20,8 @@ export function SomSipPage() {
   const gameRef = useRef<Phaser.Game | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const { playerId, betAmount } = (location.state as { playerId: string; betAmount: number }) ?? {};
+  const { playerId, betAmount, avatarSeed, avatarFrame, playerName } =
+    (location.state as GameState) ?? {};
 
   useEffect(() => {
     if (!roomId || !playerId || !containerRef.current) return;
@@ -33,14 +44,14 @@ export function SomSipPage() {
 
     gameRef.current = new Phaser.Game(config);
     gameRef.current.events.once(Phaser.Core.Events.READY, () => {
-      gameRef.current?.scene.start('SomSipScene', { roomId, playerId, betAmount });
+      gameRef.current?.scene.start('SomSipScene', { roomId, playerId, betAmount, avatarSeed, avatarFrame });
     });
 
     return () => {
       gameRef.current?.destroy(true);
       gameRef.current = null;
     };
-  }, [roomId, playerId, betAmount]);
+  }, [roomId, playerId, betAmount, avatarSeed, avatarFrame]);
 
   if (!playerId) {
     navigate('/');
@@ -50,14 +61,25 @@ export function SomSipPage() {
   return (
     <div style={s.root}>
       <div style={s.topBar}>
-        <div style={s.gameTitle}>🀄 สมสิบ</div>
+        <div style={s.left}>
+          <Gamepad2 size={20} color="#ffd700" />
+          <div style={s.gameTitle}>สมสิบ</div>
+        </div>
         <div style={s.roomInfo}>
           <span style={s.tag}>ห้อง: {roomId?.slice(0, 8).toUpperCase()}</span>
-          <span style={s.tag}>💰 เดิมพัน: {betAmount} บาท</span>
+          <span style={s.tag}>
+            <Coins size={11} color="#ffd700" style={{ marginRight: 4 }} />
+            เดิมพัน: {betAmount} บาท
+          </span>
         </div>
-        <button style={s.backBtn} onClick={() => { window.location.href = '/'; }}>
-          🏠 ออก
-        </button>
+        <div style={s.right}>
+          <AvatarBubble avatarSeed={avatarSeed} avatarFrame={avatarFrame} size={32} />
+          {playerName && <span style={s.playerName}>{playerName}</span>}
+          <button style={s.backBtn} onClick={() => { window.location.href = '/'; }}>
+            <LogOut size={13} />
+            ออก
+          </button>
+        </div>
       </div>
       <div style={s.canvasWrap}>
         <div ref={containerRef} style={s.canvas} />
@@ -81,6 +103,7 @@ const s: Record<string, React.CSSProperties> = {
     borderBottom: '1px solid rgba(200,164,74,0.2)',
     gap: 16, flexShrink: 0,
   },
+  left: { display: 'flex', alignItems: 'center', gap: 8 },
   gameTitle: {
     fontSize: 18, fontWeight: 800, letterSpacing: 1,
     background: 'linear-gradient(135deg, #ffd700, #c8a44a)',
@@ -92,20 +115,25 @@ const s: Record<string, React.CSSProperties> = {
     background: 'rgba(255,255,255,0.06)',
     border: '1px solid rgba(255,255,255,0.1)',
     borderRadius: 12, padding: '4px 12px',
+    display: 'flex', alignItems: 'center',
   },
+  right: { display: 'flex', alignItems: 'center', gap: 8 },
+  playerName: { fontSize: 13, color: '#ccc', fontWeight: 600, maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   backBtn: {
-    padding: '6px 16px',
+    display: 'flex', alignItems: 'center', gap: 5,
+    padding: '6px 14px',
     background: 'rgba(255,59,59,0.12)',
     border: '1px solid rgba(255,59,59,0.25)',
     borderRadius: 14, color: '#ff6b6b',
     cursor: 'pointer', fontSize: 13, fontWeight: 600,
   },
   canvasWrap: {
-    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+    flex: 1,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
     overflow: 'hidden',
+    background: '#020509',
   },
   canvas: {
-    width: '100%', height: '100%',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
 };

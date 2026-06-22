@@ -44,17 +44,22 @@ export function registerLobbyHandlers(io: Server, socket: Socket, rm: RoomManage
     }
   );
 
-  socket.on('start_with_bots', (data: { roomId: string }) => {
+  socket.on('start_with_bots', (data: { roomId: string; botCount?: number }) => {
     const room = rm.getRoom(data.roomId);
     if (!room || room.started) return;
 
-    // เติม bot ให้ครบ 2 คน
-    while (room.players.length < 2) {
+    const humanCount = room.players.filter((p) => !p.isBot).length;
+    const maxBots = room.maxPlayers - humanCount;
+    const wantBots = Math.min(Math.max(1, data.botCount ?? 1), maxBots);
+    const botsToAdd = Math.max(0, wantBots - room.players.filter((p) => p.isBot).length);
+
+    for (let i = 0; i < botsToAdd; i++) {
       const botId = uuidv4();
+      const botNum = room.players.filter((p) => p.isBot).length + 1;
       room.addPlayer({
         socketId: `bot_${botId}`,
         playerId: botId,
-        name: `Bot ${room.players.length + 1}`,
+        name: `Bot ${botNum}`,
         balance: 1000,
         isBot: true,
         isGuest: true,
