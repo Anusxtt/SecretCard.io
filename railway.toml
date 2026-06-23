@@ -1,0 +1,7 @@
+[build]
+buildCommand = "cd server && npm install && npm run build"
+
+[deploy]
+startCommand = "cd server && npm start"
+healthcheckPath = "/health"
+healthcheckTimeout = 30
