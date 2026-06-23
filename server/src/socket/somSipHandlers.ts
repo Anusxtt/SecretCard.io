@@ -85,7 +85,13 @@ async function handleFinish(io: Server, room: SomSipRoom, winnerId: string) {
     'somsip',
     winnerId,
     pot,
-    room.players.map((p) => ({ id: p.playerId, name: p.name }))
+    gs.players.map((p) => ({
+      id: p.playerId,
+      name: p.name,
+      isBot: p.isBot,
+      hand: p.hand,
+      total: p.hand.reduce((s, c) => s + c.rank, 0),
+    }))
   );
 
   io.to(room.roomId).emit('ss:finished', {

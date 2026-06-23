@@ -6,7 +6,7 @@ import { supabase } from '../lib/supabase';
 import {
   Shield, Users, Gamepad2, BarChart3, Search,
   RefreshCw, LogOut, ChevronLeft, ChevronRight,
-  Coins, Trophy, X, Edit3, Check
+  Coins, Trophy, X, Edit3, Check, History
 } from 'lucide-react';
 
 /* ─── types ─── */
@@ -37,7 +37,25 @@ interface RoomInfo {
   players: { playerId: string; name: string; isBot: boolean; isGuest: boolean }[];
 }
 
-type Tab = 'overview' | 'players' | 'rooms';
+interface HistoryPlayer {
+  id: string;
+  name: string;
+  isBot: boolean;
+  hand: { id: string; suit: string; rank: number }[];
+  total: number;
+}
+
+interface HistoryRow {
+  id: string;
+  game_type: string;
+  winner_id: string | null;
+  winner_name: string;
+  pot: number;
+  players: HistoryPlayer[];
+  created_at: string;
+}
+
+type Tab = 'overview' | 'players' | 'rooms' | 'history';
 
 /* ─── helpers ─── */
 const fmt = (n: number) => n.toLocaleString();
@@ -60,6 +78,10 @@ export function AdminPage() {
   const [searchRes, setSearchRes] = useState<PlayerRow[] | null>(null);
   const [editingBalance, setEditingBalance] = useState<{ id: string; value: string } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [history, setHistory] = useState<HistoryRow[]>([]);
+  const [historyTotal, setHistoryTotal] = useState(0);
+  const [historyPage, setHistoryPage] = useState(0);
+  const [selectedHistory, setSelectedHistory] = useState<HistoryRow | null>(null);
   const PAGE_SIZE = 20;
 
   /* ─── verify admin ─── */
@@ -97,6 +119,10 @@ export function AdminPage() {
       showToast(`ปิดห้อง ${roomId} แล้ว`);
     });
     socket.on('admin:error', ({ message }: { message: string }) => showToast(`Error: ${message}`));
+    socket.on('admin:history', ({ rows, total }: { rows: HistoryRow[]; total: number }) => {
+      setHistory(rows);
+      setHistoryTotal(total);
+    });
 
     return () => {
       socket.off('admin:stats');
@@ -106,6 +132,7 @@ export function AdminPage() {
       socket.off('admin:adjust_balance_ok');
       socket.off('admin:kick_room_ok');
       socket.off('admin:error');
+      socket.off('admin:history');
     };
   }, [socket, isAdmin]);
 
@@ -130,16 +157,26 @@ export function AdminPage() {
     socket.emit('admin:get_rooms', { userId: user.id });
   }, [socket, user]);
 
+  const fetchHistory = useCallback((p: number) => {
+    if (!user) return;
+    socket.emit('admin:get_history', { userId: user.id, limit: PAGE_SIZE, offset: p * PAGE_SIZE });
+  }, [socket, user]);
+
   useEffect(() => {
     if (!isAdmin || !user) return;
     if (tab === 'overview') fetchStats();
     if (tab === 'players') { setSearchRes(null); setSearchQ(''); fetchPlayers(0); }
     if (tab === 'rooms') fetchRooms();
+    if (tab === 'history') { setHistoryPage(0); fetchHistory(0); }
   }, [tab, isAdmin, user]);
 
   useEffect(() => {
     if (tab === 'players' && searchRes === null) fetchPlayers(page);
   }, [page]);
+
+  useEffect(() => {
+    if (tab === 'history') fetchHistory(historyPage);
+  }, [historyPage]);
 
   const handleSearch = () => {
     if (!user || !searchQ.trim()) return;
@@ -181,9 +218,9 @@ export function AdminPage() {
           <span style={s.logoText}>Admin</span>
         </div>
 
-        {(['overview', 'players', 'rooms'] as Tab[]).map((t) => {
-          const icons = { overview: <BarChart3 size={16} />, players: <Users size={16} />, rooms: <Gamepad2 size={16} /> };
-          const labels = { overview: 'ภาพรวม', players: 'ผู้เล่น', rooms: 'ห้อง/เกม' };
+        {(['overview', 'players', 'rooms', 'history'] as Tab[]).map((t) => {
+          const icons = { overview: <BarChart3 size={16} />, players: <Users size={16} />, rooms: <Gamepad2 size={16} />, history: <History size={16} /> };
+          const labels = { overview: 'ภาพรวม', players: 'ผู้เล่น', rooms: 'ห้อง/เกม', history: 'ประวัติการเล่น' };
           return (
             <button key={t} style={{ ...s.navBtn, ...(tab === t ? s.navActive : {}) }} onClick={() => setTab(t)}>
               {icons[t]}
@@ -207,11 +244,13 @@ export function AdminPage() {
             {tab === 'overview' && 'ภาพรวมระบบ'}
             {tab === 'players' && 'จัดการผู้เล่น'}
             {tab === 'rooms' && 'ห้องเกมที่กำลังเล่น'}
+            {tab === 'history' && 'ประวัติการเล่นทั้งหมด'}
           </div>
           <button style={s.refreshBtn} onClick={() => {
             if (tab === 'overview') fetchStats();
             if (tab === 'players') fetchPlayers(page);
             if (tab === 'rooms') fetchRooms();
+            if (tab === 'history') fetchHistory(historyPage);
           }}>
             <RefreshCw size={14} />
             รีเฟรช
@@ -400,12 +439,121 @@ export function AdminPage() {
             )}
           </div>
         )}
+        {/* ── HISTORY ── */}
+        {tab === 'history' && (
+          <div style={s.content}>
+            <div style={s.tableWrap}>
+              <table style={s.table}>
+                <thead>
+                  <tr>
+                    {['#', 'เกม', 'ผู้ชนะ', 'เงินรางวัล', 'ผู้เล่น', 'เวลา', ''].map((h) => (
+                      <th key={h} style={s.th}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {history.map((row, i) => (
+                    <tr key={row.id} style={{ ...s.tr, ...(i % 2 === 0 ? s.trEven : {}) }}>
+                      <td style={s.td}><span style={{ color: '#555', fontSize: 12 }}>{historyPage * PAGE_SIZE + i + 1}</span></td>
+                      <td style={s.td}>
+                        <span style={{ ...s.gameTypeBadge, background: row.game_type === 'khang' ? 'rgba(255,150,0,0.15)' : 'rgba(100,200,100,0.15)', color: row.game_type === 'khang' ? '#ffb74d' : '#81c784', borderRadius: 8, padding: '2px 10px', fontSize: 12, fontWeight: 700 }}>
+                          {row.game_type === 'khang' ? 'แคง' : 'สมสิบ'}
+                        </span>
+                      </td>
+                      <td style={s.td}><span style={{ color: '#ffd700', fontWeight: 600 }}>{row.winner_name}</span></td>
+                      <td style={s.td}><span style={{ color: '#81c784', fontWeight: 600 }}>{fmt(row.pot)} ฿</span></td>
+                      <td style={s.td}>
+                        <span style={{ color: '#aaa', fontSize: 13 }}>
+                          {row.players?.map((p) => p.name).join(', ') ?? '-'}
+                        </span>
+                      </td>
+                      <td style={s.td}><span style={{ color: '#666', fontSize: 12 }}>{new Date(row.created_at).toLocaleString('th-TH')}</span></td>
+                      <td style={s.td}>
+                        <button style={s.editBtn} onClick={() => setSelectedHistory(row)}>
+                          <Search size={12} /> ดูรายละเอียด
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {history.length === 0 && (
+                    <tr><td colSpan={7} style={{ ...s.td, textAlign: 'center', color: '#555', padding: 32 }}>ยังไม่มีประวัติการเล่น</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div style={s.pagination}>
+              <button style={s.pageBtn} disabled={historyPage === 0} onClick={() => setHistoryPage((p) => p - 1)}><ChevronLeft size={14} /></button>
+              <span style={{ color: '#888', fontSize: 13 }}>หน้า {historyPage + 1} / {Math.max(1, Math.ceil(historyTotal / PAGE_SIZE))}</span>
+              <button style={s.pageBtn} disabled={(historyPage + 1) * PAGE_SIZE >= historyTotal} onClick={() => setHistoryPage((p) => p + 1)}><ChevronRight size={14} /></button>
+            </div>
+          </div>
+        )}
       </main>
+
+      {/* ── History Detail Modal ── */}
+      {selectedHistory && (
+        <div style={s.modalOverlay} onClick={() => setSelectedHistory(null)}>
+          <div style={s.modalBox} onClick={(e) => e.stopPropagation()}>
+            <div style={s.modalHeader}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <History size={18} color="#ffd700" />
+                <span style={{ fontSize: 18, fontWeight: 700, color: '#fff' }}>รายละเอียดเกม</span>
+                <span style={{ ...s.gameTypeBadge, background: selectedHistory.game_type === 'khang' ? 'rgba(255,150,0,0.15)' : 'rgba(100,200,100,0.15)', color: selectedHistory.game_type === 'khang' ? '#ffb74d' : '#81c784', borderRadius: 8, padding: '2px 10px', fontSize: 12, fontWeight: 700 }}>
+                  {selectedHistory.game_type === 'khang' ? 'แคง' : 'สมสิบ'}
+                </span>
+              </div>
+              <button style={s.modalClose} onClick={() => setSelectedHistory(null)}><X size={16} /></button>
+            </div>
+            <div style={{ color: '#888', fontSize: 13, marginBottom: 20 }}>
+              {new Date(selectedHistory.created_at).toLocaleString('th-TH')} · เงินรางวัล <span style={{ color: '#ffd700', fontWeight: 600 }}>{fmt(selectedHistory.pot)} ฿</span>
+            </div>
+            <div style={s.playerCardGrid}>
+              {(selectedHistory.players ?? []).map((p) => {
+                const isWinner = p.id === selectedHistory.winner_id;
+                return (
+                  <div key={p.id} style={{ ...s.playerCard, ...(isWinner ? s.playerCardWinner : {}) }}>
+                    <div style={s.playerCardName}>
+                      {isWinner && <Trophy size={14} color="#ffd700" />}
+                      <span style={{ color: isWinner ? '#ffd700' : '#ddd', fontWeight: 700 }}>{p.name}</span>
+                      {p.isBot && <span style={{ color: '#555', fontSize: 11, fontWeight: 400 }}>bot</span>}
+                      {isWinner && <span style={s.winnerBadge}>ชนะ</span>}
+                    </div>
+                    <div style={s.handRow}>
+                      {(p.hand ?? []).map((card) => (
+                        <CardChip key={card.id} suit={card.suit} rank={card.rank} />
+                      ))}
+                    </div>
+                    <div style={{ marginTop: 8, fontSize: 13 }}>
+                      แต้มรวม: <span style={{ color: p.total <= 5 ? '#81c784' : p.total <= 15 ? '#f39c12' : '#ef5350', fontWeight: 700, fontSize: 16 }}>{p.total}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* toast */}
       {toast && (
         <div style={s.toast}>{toast}</div>
       )}
+    </div>
+  );
+}
+
+/* ─── CardChip ─── */
+const SUIT_COLOR: Record<string, string> = { H: '#ef5350', D: '#ef5350', S: '#fff', C: '#fff' };
+const SUIT_SYM: Record<string, string> = { H: '♥', D: '♦', S: '♠', C: '♣' };
+const RANK_LABEL: Record<number, string> = { 1: 'A', 11: 'J', 12: 'Q', 13: 'K' };
+
+function CardChip({ suit, rank }: { suit: string; rank: number }) {
+  const label = RANK_LABEL[rank] ?? String(rank);
+  const color = SUIT_COLOR[suit] ?? '#fff';
+  return (
+    <div style={s.cardChip}>
+      <span style={{ color, fontWeight: 700, fontSize: 13 }}>{label}</span>
+      <span style={{ color, fontSize: 11 }}>{SUIT_SYM[suit]}</span>
     </div>
   );
 }
@@ -633,5 +781,53 @@ const s: Record<string, React.CSSProperties> = {
     color: '#fff', fontSize: 14, fontWeight: 500,
     backdropFilter: 'blur(12px)', zIndex: 1000,
     boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+  },
+
+  /* modal */
+  modalOverlay: {
+    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    zIndex: 200, backdropFilter: 'blur(4px)',
+  },
+  modalBox: {
+    background: '#0f0f1a', border: '1px solid rgba(255,215,0,0.2)',
+    borderRadius: 20, padding: '28px 32px',
+    minWidth: 560, maxWidth: '90vw', maxHeight: '85vh',
+    overflow: 'auto', boxShadow: '0 24px 60px rgba(0,0,0,0.7)',
+  },
+  modalHeader: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  modalClose: {
+    background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: 8, color: '#aaa', cursor: 'pointer',
+    padding: '6px 8px', display: 'flex', alignItems: 'center',
+  },
+  playerCardGrid: {
+    display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+    gap: 16,
+  },
+  playerCard: {
+    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+    borderRadius: 14, padding: '16px 18px',
+  },
+  playerCardWinner: {
+    background: 'rgba(255,215,0,0.07)', border: '1px solid rgba(255,215,0,0.25)',
+  },
+  playerCardName: {
+    display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10,
+  },
+  winnerBadge: {
+    fontSize: 10, fontWeight: 700, color: '#000',
+    background: '#ffd700', borderRadius: 6, padding: '1px 7px',
+  },
+  handRow: {
+    display: 'flex', flexWrap: 'wrap' as const, gap: 5,
+  },
+  cardChip: {
+    display: 'flex', flexDirection: 'column' as const, alignItems: 'center',
+    background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.18)',
+    borderRadius: 7, padding: '4px 8px', minWidth: 30,
   },
 };

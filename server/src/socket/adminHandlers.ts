@@ -126,4 +126,35 @@ export function registerAdminHandlers(io: Server, socket: Socket, rm: RoomManage
 
     socket.emit('admin:search_result', { players: data ?? [] });
   });
+
+  socket.on('admin:get_history', async ({ userId, limit = 50, offset = 0 }: { userId: string; limit?: number; offset?: number }) => {
+    if (!(await isAdmin(userId))) {
+      socket.emit('admin:error', { message: 'Unauthorized' });
+      return;
+    }
+
+    const { data, count } = await supabase
+      .from('game_history')
+      .select('id, game_type, winner_id, pot, players, created_at', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    // ดึง username ของ winner
+    const winnerIds = [...new Set((data ?? []).map((r: any) => r.winner_id).filter(Boolean))];
+    let winnerMap: Record<string, string> = {};
+    if (winnerIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, username')
+        .in('id', winnerIds);
+      for (const p of profiles ?? []) winnerMap[p.id] = p.username;
+    }
+
+    const rows = (data ?? []).map((r: any) => ({
+      ...r,
+      winner_name: winnerMap[r.winner_id] ?? (r.players?.find((p: any) => p.id === r.winner_id)?.name ?? 'บอท/ไม่ระบุ'),
+    }));
+
+    socket.emit('admin:history', { rows, total: count ?? 0 });
+  });
 }

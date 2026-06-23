@@ -392,6 +392,7 @@ export class KhangScene extends Phaser.Scene {
     const deckX = W - 175, deckY = H / 2 - 10;
     const cardDelay = 100;
     const landed: Phaser.GameObjects.Container[] = [];
+    const myLandedCards: Phaser.GameObjects.Container[] = [];
 
     for (let round = 0; round < n; round++) {
       for (let pi = 0; pi < state.players.length; pi++) {
@@ -423,7 +424,10 @@ export class KhangScene extends Phaser.Scene {
             x: destX, y: destY,
             scaleX: isMe ? 1 : 0.65, scaleY: isMe ? 1 : 0.65,
             duration: 240, ease: 'Cubic.Out',
-            onComplete: () => { landed.push(fc); },
+            onComplete: () => {
+              landed.push(fc);
+              if (isMe) myLandedCards.push(fc);
+            },
           });
         });
       }
@@ -431,7 +435,7 @@ export class KhangScene extends Phaser.Scene {
 
     const dealEnd = n * state.players.length * cardDelay + 350;
     this.time.delayedCall(dealEnd, () => {
-      const myLanded = landed.filter(fc => Math.abs(fc.y - handY) < 10);
+      const myLanded = myLandedCards;
       me.hand.forEach((card, i) => {
         this.time.delayedCall(i * 90, () => {
           const fc = myLanded[i];
