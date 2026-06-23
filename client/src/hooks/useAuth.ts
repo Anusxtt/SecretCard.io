@@ -29,12 +29,8 @@ export function useAuth() {
 
   const createAutoGuest = (): AuthUser => {
     const id = `guest_${Date.now()}`;
-    const adjectives = ['Lucky', 'Swift', 'Bold', 'Brave', 'Sharp', 'Cool', 'Wild', 'Ace', 'Sly', 'Keen', 'Deft', 'Slick'];
-    const nouns = ['Tiger', 'Dragon', 'Eagle', 'Wolf', 'Phoenix', 'Shark', 'Panda', 'Fox', 'Cobra', 'Hawk', 'Bear', 'Lynx'];
-    const suffix = Math.floor(1000 + Math.random() * 9000); // 4-digit number → unique
-    const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
-    const noun = nouns[Math.floor(Math.random() * nouns.length)];
-    const name = `${adj}${noun}${suffix}`;
+    const suffix = Math.floor(100 + Math.random() * 900);
+    const name = `Guest_${suffix}`;
     const guest: AuthUser = { id, name, balance: 500, wins: 0, losses: 0, isGuest: true };
     localStorage.setItem('guest_user', JSON.stringify(guest));
     return guest;

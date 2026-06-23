@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../hooks/useAuth';
+import { useIsMobile } from '../hooks/useIsMobile';
 import { KeyRound, UserPlus, LogIn, Loader2, AlertTriangle, X, Eye, EyeOff, Mail, Lock, User } from 'lucide-react';
 
 interface AuthModalProps {
@@ -13,6 +14,7 @@ const SUITS = ['♠', '♥', '♦', '♣'];
 
 export function AuthModal({ onClose }: AuthModalProps) {
   const { loginWithEmail, loginWithGoogle, signupWithEmail } = useAuth();
+  const isMobile = useIsMobile();
   const [tab, setTab] = useState<Tab>('login');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -72,7 +74,7 @@ export function AuthModal({ onClose }: AuthModalProps) {
       ))}
 
       <motion.div
-        style={s.modal}
+        style={{ ...s.modal, width: isMobile ? '95vw' : 420, padding: isMobile ? '24px 20px 18px' : '32px 32px 24px' }}
         initial={{ scale: 0.85, y: 50, opacity: 0 }}
         animate={{ scale: 1, y: 0, opacity: 1 }}
         exit={{ scale: 0.85, y: 50, opacity: 0 }}

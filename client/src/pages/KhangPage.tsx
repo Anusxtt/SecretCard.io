@@ -3,7 +3,9 @@ import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import Phaser from 'phaser';
 import { KhangScene } from '../game/khang/KhangScene';
 import { AvatarBubble } from '../components/AvatarBubble';
-import { Coins, LogOut, Gamepad2 } from 'lucide-react';
+import { useIsMobile } from '../hooks/useIsMobile';
+import { useMyRank } from '../hooks/useMyRank';
+import { Coins, LogOut, Gamepad2, Trophy } from 'lucide-react';
 
 interface GameState {
   playerId: string;
@@ -11,6 +13,7 @@ interface GameState {
   avatarSeed?: string;
   avatarFrame?: string;
   playerName?: string;
+  userId?: string;
 }
 
 export function KhangPage() {
@@ -19,9 +22,12 @@ export function KhangPage() {
   const navigate = useNavigate();
   const gameRef = useRef<Phaser.Game | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
 
-  const { playerId, betAmount, avatarSeed, avatarFrame, playerName } =
+  const { playerId, betAmount, avatarSeed, avatarFrame, playerName, userId } =
     (location.state as GameState) ?? {};
+
+  const rankInfo = useMyRank(userId);
 
   useEffect(() => {
     if (!roomId || !playerId || !containerRef.current) return;
@@ -70,24 +76,35 @@ export function KhangPage() {
 
   return (
     <div style={s.root}>
-      <div style={s.topBar}>
+      <div style={{ ...s.topBar, padding: isMobile ? '8px 12px' : '10px 24px', gap: isMobile ? 8 : 16 }}>
         <div style={s.left}>
-          <Gamepad2 size={20} color="#ce93d8" />
-          <div style={s.gameTitle}>แคง</div>
+          <Gamepad2 size={isMobile ? 16 : 20} color="#ce93d8" />
+          <div style={{ ...s.gameTitle, fontSize: isMobile ? 14 : 18 }}>แคง</div>
         </div>
         <div style={s.roomInfo}>
-          <span style={s.tag}>ห้อง: {roomId?.slice(0, 8).toUpperCase()}</span>
+          {/* Room tag — hidden on mobile */}
+          {!isMobile && (
+            <span style={s.tag}>ห้อง: {roomId?.slice(0, 8).toUpperCase()}</span>
+          )}
           <span style={s.tag}>
             <Coins size={11} color="#ce93d8" style={{ marginRight: 4 }} />
-            เดิมพัน: {betAmount} บาท
+            {isMobile ? `${betAmount}฿` : `เดิมพัน: ${betAmount} บาท`}
           </span>
         </div>
-        <div style={s.right}>
-          <AvatarBubble avatarSeed={avatarSeed} avatarFrame={avatarFrame} size={32} />
-          {playerName && <span style={s.playerName}>{playerName}</span>}
-          <button style={s.backBtn} onClick={() => { window.location.href = '/'; }}>
-            <LogOut size={13} />
-            ออก
+        <div style={{ ...s.right, gap: isMobile ? 6 : 8 }}>
+          <AvatarBubble avatarSeed={avatarSeed} avatarFrame={avatarFrame} size={isMobile ? 26 : 32} />
+          {!isMobile && playerName && <span style={s.playerName}>{playerName}</span>}
+          {rankInfo && (
+            <span style={s.rankBadge}>
+              <Trophy size={11} color="#ffd700" />
+              #{rankInfo.rank}
+            </span>
+          )}
+          <button
+            style={{ ...s.backBtn, padding: isMobile ? '5px 10px' : '6px 14px', fontSize: isMobile ? 12 : 13 }}
+            onClick={() => { window.location.href = '/'; }}>
+            <LogOut size={isMobile ? 12 : 13} />
+            {!isMobile && 'ออก'}
           </button>
         </div>
       </div>
@@ -129,6 +146,13 @@ const s: Record<string, React.CSSProperties> = {
   },
   right: { display: 'flex', alignItems: 'center', gap: 8 },
   playerName: { fontSize: 13, color: '#ccc', fontWeight: 600, maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  rankBadge: {
+    display: 'flex', alignItems: 'center', gap: 4,
+    fontSize: 12, fontWeight: 700, color: '#ffd700',
+    background: 'rgba(255,215,0,0.1)',
+    border: '1px solid rgba(255,215,0,0.25)',
+    borderRadius: 12, padding: '3px 10px',
+  },
   backBtn: {
     display: 'flex', alignItems: 'center', gap: 5,
     padding: '6px 14px',

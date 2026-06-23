@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../hooks/useAuth';
 import { useSocket } from '../hooks/useSocket';
 import { useT } from '../lib/i18n';
+import { useIsMobile } from '../hooks/useIsMobile';
 import { AuthModal } from '../components/AuthModal';
 import { Leaderboard } from '../components/Leaderboard';
 import { AvatarBubble } from '../components/AvatarBubble';
@@ -34,6 +35,7 @@ export function LobbyPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { t, lang, toggle } = useT();
+  const isMobile = useIsMobile();
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [gameType, setGameType] = useState<GameType>('somsip');
   const [betAmount, setBetAmount] = useState(5);
@@ -61,10 +63,16 @@ export function LobbyPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, user]);
 
-  const joinGame = (withBots: boolean, gt: GameType = gameType, ba: number = betAmount) => {
+  const joinGame = (withBots: boolean, gt: GameType = gameType, ba: number = betAmount, bc: number = botCount) => {
     if (!user) return;
     if (user.balance < ba) return alert(t.notEnoughBalance);
     setJoining(true);
+
+    // เคลียร์ listeners เก่าก่อนเสมอ เพื่อกัน stack ซ้อน
+    socket.off('joined_room');
+    socket.off('game_ready');
+    socket.off('game_start');
+
     socket.emit('join_lobby', {
       gameType: gt, betAmount: ba,
       playerName: user.name,
@@ -74,14 +82,16 @@ export function LobbyPage() {
     });
     socket.once('joined_room', ({ roomId, playerId }: { roomId: string; playerId: string }) => {
       const goToGame = () => {
+        socket.off('game_ready');
+        socket.off('game_start');
         navigate(`/${gt}/${roomId}`, {
-          state: { playerId, betAmount: ba, avatarSeed: user.avatarSeed, avatarFrame: user.avatarFrame, playerName: user.name },
+          state: { playerId, betAmount: ba, avatarSeed: user.avatarSeed, avatarFrame: user.avatarFrame, playerName: user.name, userId: user.isGuest ? undefined : user.id },
         });
         setJoining(false);
       };
       socket.once('game_ready', goToGame);
       socket.once('game_start', goToGame);
-      if (withBots) socket.emit('start_with_bots', { roomId, botCount });
+      if (withBots) socket.emit('start_with_bots', { roomId, botCount: bc });
     });
   };
 
@@ -127,7 +137,9 @@ export function LobbyPage() {
         {showBotConfig && (
           <motion.div style={s.modalOverlay} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             onClick={() => setShowBotConfig(false)}>
-            <motion.div style={s.botConfigModal} initial={{ scale: 0.85, y: 40 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.85, y: 40 }}
+            <motion.div
+              style={{ ...s.botConfigModal, width: isMobile ? '95vw' : undefined, maxWidth: isMobile ? '95vw' : 440, padding: isMobile ? '24px 20px' : '32px 36px' }}
+              initial={{ scale: 0.85, y: 40 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.85, y: 40 }}
               transition={{ type: 'spring', stiffness: 320, damping: 28 }}
               onClick={(e: React.MouseEvent) => e.stopPropagation()}>
               <button style={s.closeBtn} onClick={() => setShowBotConfig(false)}><X size={16} /></button>
@@ -161,7 +173,7 @@ export function LobbyPage() {
                 </div>
               </div>
               <motion.button style={{ ...s.playBtn, ...s.botBtn, marginTop: 8 }}
-                onClick={() => { setShowBotConfig(false); joinGame(true); }}
+                onClick={() => { setShowBotConfig(false); joinGame(true, gameType, betAmount, botCount); }}
                 disabled={joining}
                 whileHover={joining ? {} : { scale: 1.03, boxShadow: '0 8px 32px rgba(21,101,192,0.55)' }}
                 whileTap={joining ? {} : { scale: 0.97 }}>
@@ -188,61 +200,85 @@ export function LobbyPage() {
       </AnimatePresence>
 
       {/* Header */}
-      <motion.header style={s.header} initial={{ y: -80, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.5, ease: 'easeOut' }}>
+      <motion.header
+        style={{ ...s.header, padding: isMobile ? '12px 16px' : '16px 40px' }}
+        initial={{ y: -80, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.5, ease: 'easeOut' }}>
         <div style={s.logo}>
           <motion.div animate={{ rotate: [0, 10, -8, 0] }} transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}>
-            <Spade size={34} color="#ffd700" fill="#ffd700" />
+            <Spade size={isMobile ? 26 : 34} color="#ffd700" fill="#ffd700" />
           </motion.div>
           <div>
-            <div style={s.logoTitle}>SecretCard.io</div>
-            <div style={s.logoSub}>{t.onlineCard}</div>
+            <div style={{ ...s.logoTitle, fontSize: isMobile ? 16 : 22 }}>SecretCard.io</div>
+            {!isMobile && <div style={s.logoSub}>{t.onlineCard}</div>}
           </div>
         </div>
-        <nav style={s.nav}>
+        <nav style={{ ...s.nav, gap: isMobile ? 8 : 14 }}>
+          {/* Lang toggle — always visible */}
           <motion.button style={s.langBtn} onClick={toggle} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
             {lang === 'th' ? 'EN' : 'TH'}
           </motion.button>
-          <motion.button style={s.navBtn} onClick={() => setShowLeaderboard(true)} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-            <Trophy size={14} />{t.rankBtn.replace('🏆 ', '')}
-          </motion.button>
+          {/* Rank button — hidden on mobile */}
+          {!isMobile && (
+            <motion.button style={s.navBtn} onClick={() => setShowLeaderboard(true)} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+              <Trophy size={14} />{t.rankBtn.replace('🏆 ', '')}
+            </motion.button>
+          )}
           {user ? (
-            <div style={s.userArea}>
-              <motion.div style={s.walletChip} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
-                <AvatarBubble avatarSeed={user.avatarSeed} avatarFrame={user.avatarFrame} size={36} />
+            <div style={{ ...s.userArea, gap: isMobile ? 8 : 12 }}>
+              <motion.div
+                style={{ ...s.walletChip, padding: isMobile ? '6px 10px' : '8px 18px', gap: isMobile ? 6 : 10 }}
+                initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
+                <AvatarBubble avatarSeed={user.avatarSeed} avatarFrame={user.avatarFrame} size={isMobile ? 28 : 36} />
                 <div>
-                  <div style={s.walletName}>{user.isGuest ? user.name : user.name}</div>
-                  <div style={s.walletBal}>
-                    <Wallet size={13} color="#ffd700" style={{ marginRight: 4 }} />
+                  {!isMobile && <div style={s.walletName}>{user.isGuest ? user.name : user.name}</div>}
+                  <div style={{ ...s.walletBal, fontSize: isMobile ? 12 : 15 }}>
+                    <Wallet size={isMobile ? 11 : 13} color="#ffd700" style={{ marginRight: 4 }} />
                     {user.balance.toLocaleString()} {t.baht}
-                    {user.isGuest && <span style={s.guestTag}>Guest</span>}
                   </div>
+                  {user.isGuest && !isMobile && <span style={s.guestTag}>Guest</span>}
                 </div>
               </motion.div>
+              {/* Profile & Logout — hidden on mobile */}
               {user.isGuest ? (
-                <motion.button style={s.loginBtn} onClick={() => setShowAuthModal(true)} whileHover={{ scale: 1.05, boxShadow: '0 0 24px rgba(255,215,0,0.4)' }} whileTap={{ scale: 0.95 }}>
-                  <LogIn size={14} />{t.loginSignup}
+                <motion.button style={{ ...s.loginBtn, padding: isMobile ? '8px 14px' : '10px 24px', fontSize: isMobile ? 12 : 14 }}
+                  onClick={() => setShowAuthModal(true)}
+                  whileHover={{ scale: 1.05, boxShadow: '0 0 24px rgba(255,215,0,0.4)' }} whileTap={{ scale: 0.95 }}>
+                  <LogIn size={isMobile ? 12 : 14} />{!isMobile && t.loginSignup}
+                  {isMobile && 'Login'}
                 </motion.button>
               ) : (
-                <>
-                  <motion.button style={s.profileBtn} onClick={() => navigate('/profile')} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>โปรไฟล์</motion.button>
-                  <motion.button style={s.logoutBtn} onClick={logout} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                    <LogOut size={14} />{t.logoutBtn}
-                  </motion.button>
-                </>
+                !isMobile && (
+                  <>
+                    <motion.button style={s.profileBtn} onClick={() => navigate('/profile')} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>โปรไฟล์</motion.button>
+                    <motion.button style={s.logoutBtn} onClick={logout} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                      <LogOut size={14} />{t.logoutBtn}
+                    </motion.button>
+                  </>
+                )
+              )}
+              {/* Mobile: logout icon only */}
+              {isMobile && !user.isGuest && (
+                <motion.button style={{ ...s.logoutBtn, padding: '6px 10px' }} onClick={logout} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                  <LogOut size={14} />
+                </motion.button>
               )}
             </div>
           ) : (
-            <motion.button style={s.loginBtn} onClick={() => setShowAuthModal(true)} whileHover={{ scale: 1.05, boxShadow: '0 0 24px rgba(255,215,0,0.4)' }} whileTap={{ scale: 0.95 }}>
-              <LogIn size={14} />{t.loginSignup}
+            <motion.button
+              style={{ ...s.loginBtn, padding: isMobile ? '8px 14px' : '10px 24px', fontSize: isMobile ? 12 : 14 }}
+              onClick={() => setShowAuthModal(true)}
+              whileHover={{ scale: 1.05, boxShadow: '0 0 24px rgba(255,215,0,0.4)' }} whileTap={{ scale: 0.95 }}>
+              <LogIn size={isMobile ? 12 : 14} />{isMobile ? 'Login' : t.loginSignup}
             </motion.button>
           )}
         </nav>
       </motion.header>
 
       {/* Main */}
-      <main style={s.main}>
+      <main style={{ ...s.main, flexDirection: isMobile ? 'column' : 'row', padding: isMobile ? '16px 12px' : '32px 40px', gap: isMobile ? 16 : 24 }}>
         {/* Game Panel */}
-        <motion.section style={s.gamePanel}
+        <motion.section
+          style={{ ...s.gamePanel, padding: isMobile ? '20px 16px' : '30px 32px', gap: isMobile ? 16 : 24 }}
           initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.15 }}>
 
           <div style={s.panelTitle}>
@@ -251,11 +287,12 @@ export function LobbyPage() {
           </div>
 
           {/* Game cards */}
-          <div style={s.gameCards}>
+          <div style={{ ...s.gameCards, gap: isMobile ? 10 : 14 }}>
             {games.map((g, i) => {
               const active = gameType === g.id;
               return (
-                <motion.button key={g.id} style={{ ...s.gCard, ...(active ? { ...s.gCardActive, borderColor: g.accent + '99' } : {}) }}
+                <motion.button key={g.id}
+                  style={{ ...s.gCard, padding: isMobile ? '16px 10px 14px' : '24px 14px 20px', ...(active ? { ...s.gCardActive, borderColor: g.accent + '99' } : {}) }}
                   onClick={() => setGameType(g.id)}
                   initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 + i * 0.1 }}
                   whileHover={{ y: -6, boxShadow: `0 12px 36px ${g.accent}22` }}
@@ -263,10 +300,10 @@ export function LobbyPage() {
                   <motion.div style={{ ...s.gCardGlow, background: `radial-gradient(ellipse at 50% 0%, ${g.accent}20 0%, transparent 70%)`, opacity: active ? 1 : 0 }}
                     animate={{ opacity: active ? 1 : 0 }} />
                   <motion.div animate={active ? { rotate: [0, -8, 8, 0] } : {}} transition={{ duration: 0.4 }}>
-                    <Gamepad2 size={48} color={active ? g.accent : '#555'} style={{ marginBottom: 4 }} />
+                    <Gamepad2 size={isMobile ? 36 : 48} color={active ? g.accent : '#555'} style={{ marginBottom: 4 }} />
                   </motion.div>
-                  <div style={s.gName}>{g.name}</div>
-                  <div style={s.gDesc}>{g.desc}</div>
+                  <div style={{ ...s.gName, fontSize: isMobile ? 16 : 22 }}>{g.name}</div>
+                  <div style={{ ...s.gDesc, fontSize: isMobile ? 11 : 12 }}>{g.desc}</div>
                   <div style={s.gMeta}>
                     <span style={{ fontSize: 11, color: '#888', display: 'flex', alignItems: 'center', gap: 4 }}>
                       <Users size={11} /> {g.players}
@@ -286,20 +323,26 @@ export function LobbyPage() {
           </div>
 
           {/* Action buttons */}
-          <motion.div style={s.actions} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}>
-            <motion.button style={{ ...s.playBtn, ...s.botBtn }} onClick={() => setShowBotConfig(true)} disabled={joining}
+          <motion.div
+            style={{ ...s.actions, flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 10 : 14 }}
+            initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}>
+            <motion.button
+              style={{ ...s.playBtn, ...s.botBtn, fontSize: isMobile ? 14 : 16, padding: isMobile ? '13px 16px' : '15px 20px' }}
+              onClick={() => setShowBotConfig(true)} disabled={joining}
               whileHover={joining ? {} : { scale: 1.03, boxShadow: '0 8px 32px rgba(21,101,192,0.55)' }}
               whileTap={joining ? {} : { scale: 0.97 }}
               animate={joining ? { opacity: 0.65 } : { opacity: 1 }}>
               <Bot size={16} />
-              {t.playBot.replace('🤖 ', '')}
+              {isMobile ? (lang === 'th' ? 'เล่นกับบอท' : 'vs Bot') : t.playBot.replace('🤖 ', '')}
             </motion.button>
-            <motion.button style={{ ...s.playBtn, ...s.onlineBtn }} onClick={() => joinGame(false)} disabled={joining}
+            <motion.button
+              style={{ ...s.playBtn, ...s.onlineBtn, fontSize: isMobile ? 14 : 16, padding: isMobile ? '13px 16px' : '15px 20px' }}
+              onClick={() => joinGame(false)} disabled={joining}
               whileHover={joining ? {} : { scale: 1.03, boxShadow: '0 8px 32px rgba(198,40,40,0.55)' }}
               whileTap={joining ? {} : { scale: 0.97 }}
               animate={joining ? { opacity: 0.65 } : { opacity: 1 }}>
               {joining ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Globe size={16} />}
-              {joining ? t.joining : t.playOnline.replace('🌐 ', '')}
+              {joining ? t.joining : (isMobile ? (lang === 'th' ? 'เล่นออนไลน์' : 'Online') : t.playOnline.replace('🌐 ', ''))}
             </motion.button>
           </motion.div>
 
@@ -315,24 +358,26 @@ export function LobbyPage() {
           </motion.div>
         </motion.section>
 
-        {/* Sidebar */}
-        <motion.aside style={s.sidebar} initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5, delay: 0.25 }}>
-          <Leaderboard compact />
-          <motion.div style={s.rulesCard} whileHover={{ borderColor: 'rgba(255,215,0,0.2)' }} transition={{ duration: 0.2 }}>
-            <div style={s.rulesTitle}>{t.games[gameType].name} — {lang === 'th' ? 'กติกา' : 'Rules'}</div>
-            <AnimatePresence mode="wait">
-              <motion.ul key={gameType} style={s.rulesList}
-                initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.2 }}>
-                {t.games[gameType].rules.map((r, i) => (
-                  <motion.li key={i} style={s.rulesItem} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}>
-                    {r}
-                  </motion.li>
-                ))}
-              </motion.ul>
-            </AnimatePresence>
-          </motion.div>
-        </motion.aside>
+        {/* Sidebar — hidden on mobile */}
+        {!isMobile && (
+          <motion.aside style={s.sidebar} initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5, delay: 0.25 }}>
+            <Leaderboard compact />
+            <motion.div style={s.rulesCard} whileHover={{ borderColor: 'rgba(255,215,0,0.2)' }} transition={{ duration: 0.2 }}>
+              <div style={s.rulesTitle}>{t.games[gameType].name} — {lang === 'th' ? 'กติกา' : 'Rules'}</div>
+              <AnimatePresence mode="wait">
+                <motion.ul key={gameType} style={s.rulesList}
+                  initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.2 }}>
+                  {t.games[gameType].rules.map((r, i) => (
+                    <motion.li key={i} style={s.rulesItem} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}>
+                      {r}
+                    </motion.li>
+                  ))}
+                </motion.ul>
+              </AnimatePresence>
+            </motion.div>
+          </motion.aside>
+        )}
       </main>
 
       <motion.footer style={s.footer} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }}>
@@ -418,8 +463,15 @@ const s: Record<string, React.CSSProperties> = {
     border: '1px solid rgba(255,215,0,0.2)',
     borderRadius: 24, padding: '8px 18px',
   },
-  walletName: { fontSize: 11, color: '#999' },
-  walletBal: { fontSize: 17, fontWeight: 700, color: '#ffd700', display: 'flex', alignItems: 'center' },
+  walletName: { fontSize: 13, fontWeight: 600, color: '#ddd' },
+  walletBal: { fontSize: 15, fontWeight: 700, color: '#ffd700', display: 'flex', alignItems: 'center' },
+  guestTag: {
+    fontSize: 10, fontWeight: 700, letterSpacing: 0.5,
+    color: '#888', background: 'rgba(255,255,255,0.07)',
+    border: '1px solid rgba(255,255,255,0.12)',
+    borderRadius: 6, padding: '1px 6px', marginTop: 3,
+    display: 'inline-block',
+  },
   loginBtn: {
     display: 'flex', alignItems: 'center', gap: 6,
     padding: '10px 24px',

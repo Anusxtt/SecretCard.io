@@ -2,7 +2,7 @@ import { Server, Socket } from 'socket.io';
 import { v4 as uuidv4 } from 'uuid';
 import { RoomManager } from '../rooms/RoomManager';
 import { GameType } from '../rooms/Room';
-import { getTopPlayers } from '../services/leaderboardService';
+import { getTopPlayers, getMyRank } from '../services/leaderboardService';
 
 export function registerLobbyHandlers(io: Server, socket: Socket, rm: RoomManager) {
   socket.on(
@@ -75,5 +75,10 @@ export function registerLobbyHandlers(io: Server, socket: Socket, rm: RoomManage
   socket.on('get_leaderboard', async () => {
     const entries = await getTopPlayers(10);
     socket.emit('leaderboard', entries);
+  });
+
+  socket.on('get_my_rank', async ({ userId }: { userId: string }) => {
+    const result = await getMyRank(userId);
+    socket.emit('my_rank', result);
   });
 }
