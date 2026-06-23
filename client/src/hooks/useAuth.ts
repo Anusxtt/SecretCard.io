@@ -8,6 +8,7 @@ export interface AuthUser {
   wins: number;
   losses: number;
   isGuest: boolean;
+  isAdmin?: boolean;
   avatarSeed?: string;
   avatarFrame?: string;
 }
@@ -16,13 +17,14 @@ export function useAuth() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const buildUser = (id: string, profile: { username?: string; balance?: number; wins?: number; losses?: number; avatar_seed?: string; avatar_frame?: string } | null): AuthUser => ({
+  const buildUser = (id: string, profile: { username?: string; balance?: number; wins?: number; losses?: number; avatar_seed?: string; avatar_frame?: string; is_admin?: boolean } | null): AuthUser => ({
     id,
     name: profile?.username ?? 'ผู้เล่น',
     balance: profile?.balance ?? 1000,
     wins: profile?.wins ?? 0,
     losses: profile?.losses ?? 0,
     isGuest: false,
+    isAdmin: profile?.is_admin ?? false,
     avatarSeed: profile?.avatar_seed ?? undefined,
     avatarFrame: profile?.avatar_frame ?? 'none',
   });
@@ -44,7 +46,7 @@ export function useAuth() {
         // logged-in user — ignore any guest
         const { data: profile } = await supabase
           .from('profiles')
-          .select('username, balance, wins, losses, avatar_seed, avatar_frame')
+          .select('username, balance, wins, losses, avatar_seed, avatar_frame, is_admin')
           .eq('id', data.session.user.id)
           .single();
         setUser(buildUser(data.session.user.id, profile));
@@ -61,7 +63,7 @@ export function useAuth() {
       if (session?.user) {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('username, balance, wins, losses, avatar_seed, avatar_frame')
+          .select('username, balance, wins, losses, avatar_seed, avatar_frame, is_admin')
           .eq('id', session.user.id)
           .single();
         setUser(buildUser(session.user.id, profile));
@@ -128,7 +130,7 @@ export function useAuth() {
     if (!user || user.isGuest) return;
     const { data: profile } = await supabase
       .from('profiles')
-      .select('username, balance, wins, losses, avatar_seed, avatar_frame')
+      .select('username, balance, wins, losses, avatar_seed, avatar_frame, is_admin')
       .eq('id', user.id)
       .single();
     if (profile) setUser(buildUser(user.id, profile));

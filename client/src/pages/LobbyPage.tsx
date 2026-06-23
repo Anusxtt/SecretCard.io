@@ -249,6 +249,11 @@ export function LobbyPage() {
               ) : (
                 !isMobile && (
                   <>
+                    {user.isAdmin && (
+                      <motion.button style={s.adminBtn} onClick={() => navigate('/admin')} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                        <Shield size={13} />Admin
+                      </motion.button>
+                    )}
                     <motion.button style={s.profileBtn} onClick={() => navigate('/profile')} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>โปรไฟล์</motion.button>
                     <motion.button style={s.logoutBtn} onClick={logout} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                       <LogOut size={14} />{t.logoutBtn}
@@ -478,6 +483,13 @@ const s: Record<string, React.CSSProperties> = {
     background: 'linear-gradient(135deg, #ffd700, #ff9800)',
     border: 'none', borderRadius: 24, color: '#000',
     fontWeight: 700, cursor: 'pointer', fontSize: 14,
+  },
+  adminBtn: {
+    display: 'flex', alignItems: 'center', gap: 6,
+    padding: '8px 16px',
+    background: 'rgba(255,59,59,0.1)',
+    border: '1px solid rgba(255,59,59,0.3)',
+    borderRadius: 20, color: '#ff6b6b', cursor: 'pointer', fontSize: 13, fontWeight: 700,
   },
   profileBtn: {
     display: 'flex', alignItems: 'center', gap: 6,

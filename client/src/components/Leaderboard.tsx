@@ -20,9 +20,20 @@ export function Leaderboard({ compact = false }: { compact?: boolean }) {
   const [entries, setEntries] = useState<Entry[]>([]);
 
   useEffect(() => {
-    socket.emit('get_leaderboard');
+    const request = () => socket.emit('get_leaderboard');
+
     socket.on('leaderboard', (data: Entry[]) => setEntries(data));
-    return () => { socket.off('leaderboard'); };
+
+    // emit ทันทีถ้า connect แล้ว และ retry เมื่อ reconnect
+    if (socket.connected) {
+      request();
+    }
+    socket.on('connect', request);
+
+    return () => {
+      socket.off('leaderboard');
+      socket.off('connect', request);
+    };
   }, [socket]);
 
   const displayEntries = compact ? entries.slice(0, 5) : entries;

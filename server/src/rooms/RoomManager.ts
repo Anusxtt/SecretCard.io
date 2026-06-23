@@ -59,6 +59,10 @@ export class RoomManager {
     }
   }
 
+  getAllRooms(): Room[] {
+    return Array.from(this.rooms.values());
+  }
+
   findWaitingRoom(gameType: GameType, betAmount: number): Room | undefined {
     for (const room of this.rooms.values()) {
       if (room.gameType === gameType && room.betAmount === betAmount && !room.started && !room.isFull()) {

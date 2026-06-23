@@ -15,9 +15,21 @@ export function useMyRank(userId: string | undefined) {
 
   useEffect(() => {
     if (!userId) return;
-    socket.emit('get_my_rank', { userId });
+
+    const request = () => socket.emit('get_my_rank', { userId });
+
     socket.on('my_rank', (data: RankInfo | null) => setRankInfo(data));
-    return () => { socket.off('my_rank'); };
+
+    if (socket.connected) {
+      request();
+    } else {
+      socket.once('connect', request);
+    }
+
+    return () => {
+      socket.off('my_rank');
+      socket.off('connect', request);
+    };
   }, [socket, userId]);
 
   return rankInfo;

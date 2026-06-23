@@ -7,6 +7,7 @@ import { RoomManager } from './rooms/RoomManager';
 import { registerLobbyHandlers } from './socket/lobbyHandlers';
 import { registerSomSipHandlers } from './socket/somSipHandlers';
 import { registerKhangHandlers } from './socket/khangHandlers';
+import { registerAdminHandlers } from './socket/adminHandlers';
 
 const app = express();
 const httpServer = createServer(app);
@@ -35,6 +36,7 @@ io.on('connection', (socket) => {
   registerLobbyHandlers(io, socket, roomManager);
   registerSomSipHandlers(io, socket, roomManager);
   registerKhangHandlers(io, socket, roomManager);
+  registerAdminHandlers(io, socket, roomManager);
 
   socket.on('disconnect', () => {
     console.log(`[socket] disconnected: ${socket.id}`);
