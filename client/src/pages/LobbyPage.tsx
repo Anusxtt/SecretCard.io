@@ -40,6 +40,7 @@ export function LobbyPage() {
   const [joining, setJoining] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [botCount, setBotCount] = useState(1);
+  const [showBotConfig, setShowBotConfig] = useState(false);
   const wasLoggedIn = useRef(false);
   const autoJoinFired = useRef(false);
 
@@ -121,13 +122,64 @@ export function LobbyPage() {
         {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
       </AnimatePresence>
 
+      {/* Bot Config Modal */}
+      <AnimatePresence>
+        {showBotConfig && (
+          <motion.div style={s.modalOverlay} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={() => setShowBotConfig(false)}>
+            <motion.div style={s.botConfigModal} initial={{ scale: 0.85, y: 40 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.85, y: 40 }}
+              transition={{ type: 'spring', stiffness: 320, damping: 28 }}
+              onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+              <button style={s.closeBtn} onClick={() => setShowBotConfig(false)}><X size={16} /></button>
+              <div style={s.botConfigTitle}>
+                <Bot size={20} color="#90caf9" />
+                {lang === 'th' ? 'ตั้งค่าเกมกับบอท' : 'Play with Bots'}
+              </div>
+              <div style={s.botConfigSection}>
+                <div style={s.sectionLabel}><Coins size={13} color="#888" /><span>{lang === 'th' ? 'เดิมพัน' : 'Bet Amount'}</span></div>
+                <div style={s.betChips}>
+                  {BET_OPTIONS.map((b) => (
+                    <motion.button key={b} style={{ ...s.chip, ...(betAmount === b ? s.chipActive : {}) }}
+                      onClick={() => setBetAmount(b)}
+                      whileHover={{ y: -3 }} whileTap={{ scale: 0.93 }}>
+                      <span style={s.chipVal}>{b}</span>
+                      <span style={s.chipUnit}>{t.baht}</span>
+                    </motion.button>
+                  ))}
+                </div>
+              </div>
+              <div style={s.botConfigSection}>
+                <div style={s.sectionLabel}><Bot size={13} color="#888" /><span>{lang === 'th' ? 'จำนวนบอท' : 'Number of Bots'}</span></div>
+                <div style={s.botCountChips}>
+                  {[1, 2, 3, 4].map((n) => (
+                    <motion.button key={n} style={{ ...s.botChip, ...(botCount === n ? s.botChipActive : {}) }}
+                      onClick={() => setBotCount(n)}
+                      whileHover={{ y: -3 }} whileTap={{ scale: 0.9 }}>
+                      {n}
+                    </motion.button>
+                  ))}
+                </div>
+              </div>
+              <motion.button style={{ ...s.playBtn, ...s.botBtn, marginTop: 8 }}
+                onClick={() => { setShowBotConfig(false); joinGame(true); }}
+                disabled={joining}
+                whileHover={joining ? {} : { scale: 1.03, boxShadow: '0 8px 32px rgba(21,101,192,0.55)' }}
+                whileTap={joining ? {} : { scale: 0.97 }}>
+                {joining ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Bot size={16} />}
+                {joining ? t.joining : (lang === 'th' ? 'เริ่มเกม' : 'Start Game')}
+              </motion.button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {showLeaderboard && (
           <motion.div style={s.modalOverlay} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             onClick={() => setShowLeaderboard(false)}>
             <motion.div style={s.lbModal} initial={{ scale: 0.85, y: 40 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.85, y: 40 }}
               transition={{ type: 'spring', stiffness: 320, damping: 28 }}
-              onClick={e => e.stopPropagation()}>
+              onClick={(e: React.MouseEvent) => e.stopPropagation()}>
               <button style={s.closeBtn} onClick={() => setShowLeaderboard(false)}><X size={16} /></button>
               <Leaderboard />
             </motion.div>
@@ -233,44 +285,14 @@ export function LobbyPage() {
             })}
           </div>
 
-          {/* Bet + Bot row */}
-          <motion.div style={s.betBotRow} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.35 }}>
-            <div style={s.betSection}>
-              <div style={s.sectionLabel}><Coins size={13} color="#888" /><span>{lang === 'th' ? 'เดิมพัน' : 'Bet'}</span></div>
-              <div style={s.betChips}>
-                {BET_OPTIONS.map((b) => (
-                  <motion.button key={b} style={{ ...s.chip, ...(betAmount === b ? s.chipActive : {}) }}
-                    onClick={() => setBetAmount(b)}
-                    whileHover={{ y: -3 }} whileTap={{ scale: 0.93 }}>
-                    <span style={s.chipVal}>{b}</span>
-                    <span style={s.chipUnit}>{t.baht}</span>
-                  </motion.button>
-                ))}
-              </div>
-            </div>
-            <div style={s.dividerV} />
-            <div style={s.botSection}>
-              <div style={s.sectionLabel}><Bot size={13} color="#888" /><span>{lang === 'th' ? 'จำนวนบอท' : 'Bots'}</span></div>
-              <div style={s.botCountChips}>
-                {[1, 2, 3, 4].map((n) => (
-                  <motion.button key={n} style={{ ...s.botChip, ...(botCount === n ? s.botChipActive : {}) }}
-                    onClick={() => setBotCount(n)}
-                    whileHover={{ y: -3 }} whileTap={{ scale: 0.9 }}>
-                    {n}
-                  </motion.button>
-                ))}
-              </div>
-            </div>
-          </motion.div>
-
           {/* Action buttons */}
           <motion.div style={s.actions} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}>
-            <motion.button style={{ ...s.playBtn, ...s.botBtn }} onClick={() => joinGame(true)} disabled={joining}
+            <motion.button style={{ ...s.playBtn, ...s.botBtn }} onClick={() => setShowBotConfig(true)} disabled={joining}
               whileHover={joining ? {} : { scale: 1.03, boxShadow: '0 8px 32px rgba(21,101,192,0.55)' }}
               whileTap={joining ? {} : { scale: 0.97 }}
               animate={joining ? { opacity: 0.65 } : { opacity: 1 }}>
-              {joining ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Bot size={16} />}
-              {joining ? t.joining : t.playBot.replace('🤖 ', '')}
+              <Bot size={16} />
+              {t.playBot.replace('🤖 ', '')}
             </motion.button>
             <motion.button style={{ ...s.playBtn, ...s.onlineBtn }} onClick={() => joinGame(false)} disabled={joining}
               whileHover={joining ? {} : { scale: 1.03, boxShadow: '0 8px 32px rgba(198,40,40,0.55)' }}
@@ -565,6 +587,22 @@ const s: Record<string, React.CSSProperties> = {
     borderRadius: 24, padding: '32px 36px',
     minWidth: 340, maxWidth: 460, width: '90vw',
     boxShadow: '0 24px 80px rgba(0,0,0,0.6)',
+  },
+  botConfigModal: {
+    position: 'relative',
+    background: 'rgba(8,8,22,0.97)',
+    border: '1px solid rgba(21,101,192,0.35)',
+    borderRadius: 24, padding: '32px 36px',
+    minWidth: 340, maxWidth: 440, width: '90vw',
+    boxShadow: '0 24px 80px rgba(0,0,0,0.6)',
+    display: 'flex', flexDirection: 'column', gap: 20,
+  },
+  botConfigTitle: {
+    display: 'flex', alignItems: 'center', gap: 10,
+    fontSize: 18, fontWeight: 700, color: '#90caf9',
+  },
+  botConfigSection: {
+    display: 'flex', flexDirection: 'column', gap: 10,
   },
   closeBtn: {
     position: 'absolute', top: 14, right: 14,
