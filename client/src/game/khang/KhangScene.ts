@@ -92,7 +92,7 @@ export class KhangScene extends Phaser.Scene {
     this.createHUD();
     this.startAmbientParticles();
     this.setupSockets();
-    getSocket().emit('kh:start', { roomId: this.roomId });
+    getSocket().emit('kh:start', { roomId: this.roomId, playerId: this.myPlayerId });
   }
 
   // ── Ambient dust particles ───────────────────────────────────────────────

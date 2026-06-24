@@ -85,7 +85,7 @@ export class SomSipScene extends Phaser.Scene {
     this.createStatusBar();
     this.startAmbientParticles();
     this.setupSocketListeners();
-    getSocket().emit('ss:start', { roomId: this.roomId });
+    getSocket().emit('ss:start', { roomId: this.roomId, playerId: this.myPlayerId });
   }
 
   // ── Ambient particles ─────────────────────────────────────────────────────

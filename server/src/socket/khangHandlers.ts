@@ -5,9 +5,24 @@ import { adjustBalance, saveGameHistory, recordWin, recordLoss } from '../servic
 
 export function registerKhangHandlers(io: Server, socket: Socket, rm: RoomManager) {
 
-  socket.on('kh:start', (data: { roomId: string }) => {
+  socket.on('kh:start', (data: { roomId: string; playerId?: string }) => {
     const room = rm.getRoom(data.roomId) as KhangRoom | undefined;
-    if (!room || room.gameType !== 'khang' || room.started) return;
+    if (!room || room.gameType !== 'khang') return;
+
+    // อัปเดต socketId ของ player ในกรณีที่ socket reconnect
+    if (data.playerId) {
+      const p = room.players.find((p) => p.playerId === data.playerId);
+      if (p) {
+        p.socketId = socket.id;
+        socket.join(data.roomId);
+      }
+    }
+
+    if (room.started) {
+      // ถ้าเกมเริ่มไปแล้ว ส่ง state ปัจจุบันกลับให้ player คนที่ reconnect
+      if (room.gameState) broadcastState(io, room, room.gameState);
+      return;
+    }
 
     const state = room.startGame();
     broadcastState(io, room, state);

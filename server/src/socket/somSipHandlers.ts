@@ -4,9 +4,27 @@ import { SomSipRoom } from '../games/somsip/SomSipGame';
 import { adjustBalance, saveGameHistory, recordWin, recordLoss } from '../services/walletService';
 
 export function registerSomSipHandlers(io: Server, socket: Socket, rm: RoomManager) {
-  socket.on('ss:start', async (data: { roomId: string }) => {
+  socket.on('ss:start', async (data: { roomId: string; playerId?: string }) => {
     const room = rm.getRoom(data.roomId) as SomSipRoom | undefined;
-    if (!room || room.gameType !== 'somsip' || room.started) return;
+    if (!room || room.gameType !== 'somsip') return;
+
+    // อัปเดต socketId ของ player ในกรณีที่ socket reconnect
+    if (data.playerId) {
+      const p = room.players.find((p) => p.playerId === data.playerId);
+      if (p) {
+        p.socketId = socket.id;
+        socket.join(data.roomId);
+      }
+    }
+
+    if (room.started) {
+      // ถ้าเกมเริ่มไปแล้ว ส่ง state ปัจจุบันกลับให้ player คนที่ reconnect
+      if (room.gameState) {
+        const p = room.players.find((p) => p.socketId === socket.id);
+        if (p) socket.emit('ss:state', maskState(room.gameState, p.playerId));
+      }
+      return;
+    }
 
     const state = room.startGame();
 
